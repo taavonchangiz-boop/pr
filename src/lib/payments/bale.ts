@@ -361,6 +361,17 @@ export async function processBaleUpdate(bot: Bot, update: BaleUpdate): Promise<{
     if (!ref) {
       return { handled: false, reason: "order_not_found" };
     }
+    // IDEMPOTENCY EARLY-RETURN: if chargeId is already set, this is a
+    // legitimate Bale webhook retry for an already-finalized payment.
+    // Return handled immediately — do NOT re-verify the secret (the
+    // rawPayload was overwritten with sanitized audit JSON after the
+    // first finalization, so decryptString would fail and produce a
+    // false "secret_mismatch_on_success" on retry). The financial
+    // integrity is already guaranteed by the first call's atomic
+    // updateMany({where:{chargeId:null}}) CAS — no double credit.
+    if (ref.chargeId) {
+      return { handled: true, reason: "already_paid_idempotent" };
+    }
     // Verify secret (constant-time)
     let storedSecret = "";
     try { storedSecret = ref.rawPayload ? decryptString(ref.rawPayload) : ""; } catch { storedSecret = ""; }
