@@ -65,3 +65,6 @@ server.log
 /.next/standalone
 agent-ctx/
 tool-results/
+/.zscripts/dev.pid
+/.zscripts/dev.log
+/.zscripts/dev.out.log

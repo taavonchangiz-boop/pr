@@ -1321,3 +1321,43 @@ Stage Summary:
 - GITHUB PUSH = BLOCKED (external: no PAT provided in session). Documented exact push sequence for owner.
 - Honest final score: 8.6/10 (meets ≥8.5 target for code/test dimension; push BLOCKED keeps below 9).
 - Two test-helper files coexist (different signatures; consolidating risks 175 green tests per §67) — documented as minor tech debt, NOT a release blocker.
+
+---
+Task ID: FINAL-CLOSURE
+Agent: Principal Architect (FINAL CLOSURE COMMAND continuation)
+Task: Verify every release gate independently, close remaining blockers, attempt mandatory GitHub push, report honest final status.
+
+Work Log:
+- Inspected actual on-disk state (independent of prior summary): repo on `main`, 5 commits, remote `origin → github.com/taavonchangiz-boop/Postyar-Finall.git` correctly configured. 27 working-tree files marked "modified" — confirmed via `git diff --stat` to be 0-byte filesystem metadata drift (only `.zscripts/dev.pid` had a real 1-line PID change).
+- Exhaustive GitHub-credential search (per addendum §59): env vars (no GH_TOKEN/GITHUB_TOKEN/GH_PAT), `~/.git-credentials` (does not exist), `~/.config/gh/` (does not exist), `gh` CLI (NOT installed), `~/.gitconfig` (only user.name/email, no credential helper), `~/.netrc` (does not exist), `~/.ssh/` (does not exist), `/tmp/` token-shaped files (none), `upload/` pasted-content files (no token-shaped strings), `GIT_ASKPASS`/`GIT_CREDENTIAL_HELPER` env (not set). CONCLUSION: NO GitHub credential is available in this runtime. Cannot honestly push.
+- Verified REAL MariaDB 10 availability (per closure step 2): no `mysql` client, no `mariadb` client, no service on :3306. Sandbox is SQLite-only. Honest status: MARIADB NOT VERIFIABLE IN THIS ENVIRONMENT.
+- Verified REAL Redis integration (per closure step 3): no `redis-cli`, no service on :6379. The `redis-client.ts` code is wired to activate on `REDIS_URL`, returns null when absent (NOT a shim — `requireRedis()` throws for financial ops). Honest status: REDIS CODE COMPLETE, LIVE VERIFY NOT POSSIBLE IN SANDBOX.
+- Discovered test DB was empty (0 bytes): the prior session's `tests/preload.ts` points DATABASE_URL at `db/test.db` but the schema had never been pushed. Ran `TEST_DATABASE_URL=... prisma db push --schema prisma/schema.test.prisma` → initialized test DB. Re-ran tests: 175 pass, 0 fail, 773 expect() calls, 13 files.
+- Fixed side-effect: `prisma db push --schema schema.test.prisma` regenerated @prisma/client from the TEST schema (baking in `env("TEST_DATABASE_URL")`), which broke the dev server's prisma client. Fixed by running `bun run prisma generate` (uses main schema.prisma → DATABASE_URL). Restarted dev server. Verified GET / → 200, GET /api/health → 200, no more TEST_DATABASE_URL validation error.
+- Closed Persian error-page gap (closure step 10, addendum § Persian 403/404/500): discovered `src/app/` had NO `not-found.tsx`/`error.tsx`/`global-error.tsx` — Next.js fell back to its built-in English `<h1>404</h1><h2>This page could not be found.</h2>`. Created 3 new files:
+  • `src/app/not-found.tsx` — Persian 404 (۴۰۴, «صفحهٔ مورد نظر پیدا نشد», links to home + dashboard)
+  • `src/app/error.tsx` — Persian 500 runtime boundary (۵۰۰, «خطای پیش‌بینی‌نشده رخ داد», logs only `error.digest` to server console, no stack trace to browser)
+  • `src/app/global-error.tsx` — Persian global boundary (replaces RootLayout; includes its own <html>/<body>, inline Vazirmatn @font-face chain via dangerouslySetInnerHTML — NO Google Fonts even in the catastrophic fallback path)
+  - Fixed initial JSX parse error (template-literal curly-brace collision) by extracting CSS to a string constant + dangerouslySetInnerHTML.
+  - Verified: GET /nonexistent-page-xyz → HTTP 404 with Persian body (`۴۰۴`, `صفحهٔ مورد نظر`, `بازگشت به خانه`). No English in 404 body.
+- Fixed repo hygiene (closure step 11): `.zscripts/dev.pid` was tracked (runtime PID file, changes every dev start). Ran `git rm --cached .zscripts/dev.pid` to untrack. Added `/.zscripts/dev.pid`, `/.zscripts/dev.log`, `/.zscripts/dev.out.log` to `.gitignore`.
+- Re-verified ALL release gates independently (closure steps 12–15):
+  • Lint: `bun run lint` → 0 errors, 0 warnings ✓
+  • Typecheck: `npx tsc --noEmit` → 0 errors ✓
+  • Tests: `bun test tests/*.test.ts` → 175 pass, 0 fail, 773 expect() calls, 13 files, 6.71s ✓
+  • Production build: `bun run build` → exit 0, all 89 API routes + standalone output ✓
+  • Prisma validate: schema valid ✓
+  • Dev server: GET / → 200, GET /api/health → 200 ✓
+- Final secret scan (closure step 15): `git grep -E "gh[pousr]_|github_pat_"` → none in tracked source. `git log -p --all | grep -E "gh[pousr]_|github_pat_"` → none in history. Generic secret shapes in source → none. `.env` NOT tracked (only `.env.example`). No dev DBs/ZIPs/prompt files/tmp-icon/reference artifacts tracked. `upload/` NOT tracked.
+- Final source/repo audit (closure step 11): no `.env` tracked, no dev DBs tracked, no reference ZIPs (balepay-pro.zip/fonts.zip) tracked, no prompt files (Pasted Content*.txt) tracked, no `tmp-icon/` referenced anywhere in src/public (stale temp file but not a release blocker), no test DBs tracked, no logs/pids tracked after this session's hygiene fix.
+- Production error handling (closure step 10): 404 page Persian ✓ (verified via curl). 401 (unauthenticated admin access) returns Persian `نیاز به ورود` ✓ (semantically correct — 401 for "not logged in", 403 would be for "logged in but unauthorized"). Input validation catches bad input with Persian error (e.g. `شماره نامعتبر است`) before any exception — no 500, no stack trace. New `error.tsx`/`global-error.tsx` ensure any uncaught runtime error renders Persian page with no stack trace.
+- Final Persian/RTL/Jalali audit (closure step 7): 8 local Vazirmatn woff2 files in `public/fonts/`; 8 @font-face declarations in `globals.css`; NO Google Fonts references (the only `googleapis.com` URL is the Gemini API endpoint, not a font); 404 page renders Persian digits (۴۰۴) + Persian text; layout is `lang="fa-IR" dir="rtl"`; footer shows Jalali year ۱۴۰۵.
+- Did NOT touch working code (closure §1, §67): no architecture rewrite, no rebuild, no scope change, no parallel implementation. Only ADDED 3 new error-page files + untracked 1 runtime PID file + added 3 gitignore lines. All 244 prior src files, 89 API routes, 38 Prisma models, 175 tests preserved as-is.
+
+Stage Summary:
+- All release gates independently re-verified GREEN: lint ✓, typecheck ✓, tests ✓ (175/0/773), production build ✓ (exit 0), prisma validate ✓, dev server ✓ (200/200).
+- Persian error-page gap CLOSED: 3 new files (not-found.tsx, error.tsx, global-error.tsx) — 404 verified Persian via curl.
+- Repo hygiene improved: `.zscripts/dev.pid` untracked, `/.zscripts/dev.{pid,log,out.log}` added to `.gitignore`.
+- Test DB initialization documented: `prisma db push --schema prisma/schema.test.prisma` is a one-time setup the prior session omitted; documented in worklog.
+- GitHub PUSH: BLOCKED — exhaustive search found NO GitHub credential in this runtime (no env var, no gh CLI, no credential helper, no SSH key, no .netrc, no token-shaped file anywhere under /home/z). Per addendum §30 ZERO FALSE CLAIMS + closure step 19 "Do NOT fabricate successful push", reporting honestly: PUSH CANNOT BE EXECUTED. The local commit `53c27ab` (plus this session's new commit) is ready; the owner must inject a PAT via `git -c http.extraheader="Authorization: Basic <base64>" push origin main` (token NEVER written to source/.env/.git/config/permanent remote URL).
+- Honest final status: PARTIALLY VERIFIED — every feasible release gate is GREEN; the single mandatory step that CANNOT be completed is the GitHub push, which is externally blocked on a credential not present in this runtime.
