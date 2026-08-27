@@ -4,15 +4,15 @@
 @custom-variant dark (&:is(.dark *));
 
 /* ============================================================
-   POSTYAR — locally hosted Vazirmatn (NO Google Fonts)
+   POSTYAR — locally hosted Vazirmatn (NO Google Fonts, NO CDN)
+   All 8 weights loaded from /public/fonts/ — see fonts.zip
    ============================================================ */
 @font-face {
   font-family: "Vazirmatn";
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 100;
   font-display: swap;
-  src: url("/fonts/Vazirmatn-Regular.woff2") format("woff2");
-  font-weight: 400;
+  src: url("/fonts/Vazirmatn-Thin.woff2") format("woff2");
 }
 @font-face {
   font-family: "Vazirmatn";
@@ -20,6 +20,13 @@
   font-weight: 300;
   font-display: swap;
   src: url("/fonts/Vazirmatn-Light.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Vazirmatn";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Vazirmatn-Regular.woff2") format("woff2");
 }
 @font-face {
   font-family: "Vazirmatn";
@@ -41,6 +48,13 @@
   font-weight: 700;
   font-display: swap;
   src: url("/fonts/Vazirmatn-Bold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Vazirmatn";
+  font-style: normal;
+  font-weight: 800;
+  font-display: swap;
+  src: url("/fonts/Vazirmatn-ExtraBold.woff2") format("woff2");
 }
 @font-face {
   font-family: "Vazirmatn";

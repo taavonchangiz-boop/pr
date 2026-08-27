@@ -99,16 +99,29 @@ export function randomToken(bytes: number = 32): string {
 
 export function randomNumericCode(length: number = 6): string {
   // Cryptographically secure OTP using rejection sampling.
+  // We generate a 32-bit unsigned integer and take it modulo `max`.
+  // To eliminate modulo bias, we reject values that fall in the
+  // "biased tail" region [2^32 - (2^32 mod max), 2^32).
+  //
+  // CRITICAL: the rejection bound must use the FULL 2^32 space, not
+  // 256. The previous implementation computed
+  //   limit = Math.floor(256 / max) * max
+  // which evaluates to 0 for length >= 3 (max >= 1000), causing the
+  // rejection loop `while (n >= limit)` to become `while (n >= 0)` —
+  // a synchronous infinite loop that blocked the event loop. This
+  // broke OTP issuance for mobile login.
   const max = Math.pow(10, length);
-  const limit = Math.floor(256 / max) * max; // uniform region
-  const buf = crypto.randomBytes(8);
-  let n = 0;
-  for (let i = 0; i < 8; i++) n = (n * 256 + buf[i]) % (256 * 256 * 256);
-  while (n >= limit) {
-    n = crypto.randomBytes(4).readUInt32BE() % (256 * 256 * 256);
+  const U32 = 0x100000000; // 2^32
+  const limit = U32 - (U32 % max);
+  for (let attempts = 0; attempts < 32; attempts++) {
+    const r = crypto.randomBytes(4).readUInt32BE(0);
+    if (r < limit) {
+      return (r % max).toString().padStart(length, "0");
+    }
   }
-  const code = n % max;
-  return code.toString().padStart(length, "0");
+  // Fallback (probability vanishingly small for max << 2^32):
+  const fallback = crypto.randomBytes(4).readUInt32BE(0) % max;
+  return fallback.toString().padStart(length, "0");
 }
 
 export function hashOtp(otp: string, salt: string = "postyar-otp"): string {
