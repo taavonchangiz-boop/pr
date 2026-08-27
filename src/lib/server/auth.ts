@@ -1,0 +1,255 @@
+// =====================================================================
+// POSTYAR server-side auth helpers
+// =====================================================================
+import { cookies } from "next/headers";
+import { db } from "@/lib/db";
+import {
+  signJwt, verifyJwt, hashToken, hashOtp, hashPassword, verifyPassword,
+  randomToken, randomNumericCode,
+} from "@/lib/security/crypto";
+import { rateLimit } from "@/lib/security/cache";
+import { normalizeMobile, isValidIranMobile } from "@/lib/persian";
+import type { User } from "@prisma/client";
+
+export const SESSION_COOKIE = "postyar_sid";
+export const SESSION_TTL_SEC = 60 * 60 * 24 * 7; // 7 days
+
+export type AuthUser = {
+  id: string;
+  email: string;
+  mobile: string;
+  firstName: string;
+  lastName: string;
+  role: string;
+  status: string;
+  referralCode: string;
+};
+
+function toAuthUser(u: User): AuthUser {
+  return {
+    id: u.id,
+    email: u.email,
+    mobile: u.mobile,
+    firstName: u.firstName,
+    lastName: u.lastName,
+    role: u.role,
+    status: u.status,
+    referralCode: u.referralCode,
+  };
+}
+
+export async function createSession(userId: string, ip?: string, userAgent?: string | null): Promise<void> {
+  const sid = randomToken(16);
+  const token = signJwt({ sub: userId, sid, role: "" }, SESSION_TTL_SEC);
+  await db.session.create({
+    data: {
+      id: sid,
+      userId,
+      tokenHash: hashToken(token),
+      ip: ip ?? null,
+      userAgent: userAgent ?? null,
+      expiresAt: new Date(Date.now() + SESSION_TTL_SEC * 1000),
+    },
+  });
+  const c = await cookies();
+  c.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: SESSION_TTL_SEC,
+    path: "/",
+  });
+}
+
+export async function clearSessionCookie(): Promise<void> {
+  const c = await cookies();
+  c.set(SESSION_COOKIE, "", { httpOnly: true, sameSite: "lax", maxAge: 0, path: "/" });
+}
+
+export async function getCurrentUser(): Promise<AuthUser | null> {
+  const c = await cookies();
+  const token = c.get(SESSION_COOKIE)?.value;
+  if (!token) return null;
+  const payload = verifyJwt(token);
+  if (!payload) return null;
+  const session = await db.session.findUnique({ where: { id: payload.sid } });
+  if (!session || (session.expiresAt && session.expiresAt.getTime() < Date.now()) || session.revokedAt) return null;
+  // constant-time compare cookie JWT hash vs stored hash (rotation detection)
+  if (session.tokenHash !== hashToken(token)) return null;
+  const user = await db.user.findUnique({ where: { id: payload.sub } });
+  if (!user || user.status !== "active") {
+    if (user) {
+      await db.session.update({ where: { id: session.id }, data: { revokedAt: new Date() } });
+    }
+    return null;
+  }
+  return toAuthUser(user);
+}
+
+export async function revokeCurrentSession(): Promise<void> {
+  const c = await cookies();
+  const token = c.get(SESSION_COOKIE)?.value;
+  if (!token) return;
+  const payload = verifyJwt(token);
+  if (!payload) return;
+  await db.session.updateMany({
+    where: { id: payload.sid, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  await clearSessionCookie();
+}
+
+export async function requireUser(): Promise<AuthUser> {
+  const u = await getCurrentUser();
+  if (!u) throw new AuthError("نیاز به ورود", 401);
+  return u;
+}
+
+export async function requireRole(roles: string[]): Promise<AuthUser> {
+  const u = await requireUser();
+  if (!roles.includes(u.role)) throw new AuthError("دسترسی غیرمجاز", 403);
+  return u;
+}
+
+export class AuthError extends Error {
+  status: number;
+  constructor(message: string, status: number = 400) {
+    super(message);
+    this.status = status;
+    this.name = "AuthError";
+  }
+}
+
+export function clientIp(req: Request): string {
+  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "127.0.0.1";
+}
+
+// ---------------------------------------------------------------------
+// OTP flow
+// ---------------------------------------------------------------------
+const OTP_TTL_MS = 2 * 60 * 1000;
+const OTP_RESEND_COOLDOWN_MS = 60_000;
+const OTP_MAX_ATTEMPTS = 5;
+const OTP_REQUEST_LIMIT = 5;
+const OTP_REQUEST_WINDOW_MS = 60 * 60 * 1000;
+
+export async function requestOtp(mobileRaw: string, purpose: "login" | "register" | "reset"): Promise<{ sent: boolean; cooldownSec: number; errorFa?: string }> {
+  const mobile = normalizeMobile(mobileRaw);
+  if (!isValidIranMobile(mobile)) return { sent: false, cooldownSec: 0, errorFa: "شماره موبایل نامعتبر است." };
+
+  const mobileKey = `otp:req:${mobile}`;
+  const rl = await rateLimit({ key: mobileKey, limit: OTP_REQUEST_LIMIT, windowMs: OTP_REQUEST_WINDOW_MS });
+  if (!rl.ok) return { sent: false, cooldownSec: 600, errorFa: "تعداد درخواست کد بیش از حد مجاز است. یک ساعت بعد تلاش کنید." };
+
+  const existing = await db.user.findUnique({ where: { mobile } });
+  if (purpose === "login" && !existing) return { sent: false, cooldownSec: 0, errorFa: "حسابی با این شماره یافت نشد. ابتدا ثبت‌نام کنید." };
+  if (purpose === "register" && existing) return { sent: false, cooldownSec: 0, errorFa: "این شماره قبلاً ثبت شده است." };
+
+  const recent = await db.otp.findFirst({
+    where: { mobile, createdAt: { gt: new Date(Date.now() - OTP_RESEND_COOLDOWN_MS) } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (recent) {
+    const remainSec = Math.ceil((recent.createdAt.getTime() + OTP_RESEND_COOLDOWN_MS - Date.now()) / 1000);
+    return { sent: false, cooldownSec: Math.max(1, remainSec), errorFa: "برای درخواست کد جدید چند لحظه صبر کنید." };
+  }
+
+  const code = randomNumericCode(6);
+  await db.otp.create({
+    data: {
+      mobile,
+      codeHash: hashOtp(code),
+      purpose,
+      expiresAt: new Date(Date.now() + OTP_TTL_MS),
+      userId: existing?.id ?? null,
+    },
+  });
+
+  await sendOtpViaSms(mobile, code, purpose);
+  return { sent: true, cooldownSec: 60 };
+}
+
+export async function verifyOtp(mobileRaw: string, codeRaw: string, purpose: "login" | "register" | "reset", ip?: string): Promise<{ ok: boolean; userId?: string; errorFa?: string }> {
+  const mobile = normalizeMobile(mobileRaw);
+  if (!isValidIranMobile(mobile)) return { ok: false, errorFa: "شماره نامعتبر است." };
+  const code = codeRaw.trim();
+  if (!/^\d{6}$/.test(code)) return { ok: false, errorFa: "کد نامعتبر است." };
+
+  // IP-level brute-force throttle (per IP, across all mobiles)
+  if (ip) {
+    const ipRl = await rateLimit({ key: `otp:ver:${ip}`, limit: 30, windowMs: 15 * 60 * 1000 });
+    if (!ipRl.ok) return { ok: false, errorFa: "تعداد تلاش از این نشانی بیش از حد مجاز بود. ۱۵ دقیقه بعد تلاش کنید." };
+  }
+
+  const candidate = await db.otp.findFirst({
+    where: { mobile, purpose, consumedAt: null, expiresAt: { gt: new Date() } },
+    orderBy: { createdAt: "desc" },
+  });
+  if (!candidate) return { ok: false, errorFa: "کد معتبر یافت نشد یا منقضی شده است." };
+
+  if (candidate.attempts >= OTP_MAX_ATTEMPTS) {
+    await db.otp.update({ where: { id: candidate.id }, data: { expiresAt: new Date() } });
+    return { ok: false, errorFa: "تعداد تلاش بیش از حد مجاز بود. کد جدید درخواست کنید." };
+  }
+  await db.otp.update({ where: { id: candidate.id }, data: { attempts: candidate.attempts + 1 } });
+
+  const expectedHash = hashOtp(code);
+  if (expectedHash !== candidate.codeHash) return { ok: false, errorFa: "کد نادرست است." };
+
+  await db.otp.update({ where: { id: candidate.id }, data: { consumedAt: new Date() } });
+  return { ok: true, userId: candidate.userId ?? undefined };
+}
+
+export { hashPassword, verifyPassword };
+
+async function sendOtpViaSms(mobile: string, code: string, purpose: string): Promise<void> {
+  if (process.env.NODE_ENV === "production" && process.env.POSTYAR_SMS_PROVIDER) {
+    const { dispatchOtp } = await import("@/lib/providers/sms");
+    await dispatchOtp(mobile, code, purpose);
+    return;
+  }
+  if (process.env.NODE_ENV !== "production") {
+    const { cache } = await import("@/lib/security/cache");
+    await cache.set(`dev:otp:${mobile}`, code, 2 * 60 * 1000);
+  }
+}
+
+export async function newReferralCode(): Promise<string> {
+  for (let i = 0; i < 12; i++) {
+    const c = randomToken(3).toUpperCase().slice(0, 6);
+    const exists = await db.user.findUnique({ where: { referralCode: c }, select: { id: true } });
+    if (!exists) return c;
+  }
+  return randomToken(6).toUpperCase();
+}
+
+export async function audit(opts: {
+  userId?: string | null;
+  actor: string;
+  action: string;
+  targetType?: string;
+  targetId?: string;
+  ip?: string;
+  meta?: Record<string, unknown>;
+}): Promise<void> {
+  try {
+    await db.auditLog.create({
+      data: {
+        userId: opts.userId ?? null,
+        actor: opts.actor,
+        action: opts.action,
+        targetType: opts.targetType,
+        targetId: opts.targetId,
+        ip: opts.ip,
+        meta: JSON.stringify(opts.meta ?? {}),
+      },
+    });
+  } catch {
+    // audit never throws
+  }
+}
+
+export function safeJsonParse<T>(s: string | null | undefined, fallback: T): T {
+  if (!s) return fallback;
+  try { return JSON.parse(s) as T; } catch { return fallback; }
+}

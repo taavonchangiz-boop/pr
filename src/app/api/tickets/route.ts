@@ -1,0 +1,61 @@
+// POSTYAR — /api/tickets
+// POST create, GET list mine
+import { NextResponse } from "next/server";
+import { z } from "zod";
+import { requireUser, clientIp, AuthError } from "@/lib/server/auth";
+import { createTicket, listMyTickets, type TicketCategory, type TicketPriority } from "@/lib/tickets";
+
+const CreateSchema = z.object({
+  subject: z.string().min(3).max(200),
+  body: z.string().min(3).max(8000),
+  category: z.enum(["general", "billing", "technical", "ai", "gold", "woo", "bot", "security"]).optional(),
+  priority: z.enum(["low", "normal", "high"]).optional(),
+});
+
+export async function GET(req: Request) {
+  let user;
+  try { user = await requireUser(); } catch (e) {
+    return NextResponse.json({ errorFa: (e as AuthError).message }, { status: (e as AuthError).status });
+  }
+  const url = new URL(req.url);
+  const limit = Number(url.searchParams.get("limit") ?? "50");
+  const offset = Number(url.searchParams.get("offset") ?? "0");
+  const status = url.searchParams.get("status") ?? undefined;
+  const r = await listMyTickets(user.id, {
+    limit: Number.isFinite(limit) ? limit : 50,
+    offset: Number.isFinite(offset) ? offset : 0,
+    status: status ?? undefined,
+  });
+  return NextResponse.json(r);
+}
+
+export async function POST(req: Request) {
+  let user;
+  try { user = await requireUser(); } catch (e) {
+    return NextResponse.json({ errorFa: (e as AuthError).message }, { status: (e as AuthError).status });
+  }
+  const ip = clientIp(req);
+  let body: unknown;
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ errorFa: "بدنه درخواست نامعتبر است." }, { status: 400 });
+  }
+  const parsed = CreateSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { errorFa: parsed.error.issues[0]?.message ?? "ورودی نامعتبر است." },
+      { status: 400 },
+    );
+  }
+  const r = await createTicket({
+    userId: user.id,
+    subject: parsed.data.subject,
+    body: parsed.data.body,
+    category: parsed.data.category as TicketCategory | undefined,
+    priority: parsed.data.priority as TicketPriority | undefined,
+    ip,
+  });
+  if (!r.ok || !r.ticket) {
+    return NextResponse.json({ errorFa: r.errorFa ?? "ایجاد تیکت ناموفق بود." }, { status: 400 });
+  }
+  return NextResponse.json({ ok: true, ticket: r.ticket }, { status: 201 });
+}

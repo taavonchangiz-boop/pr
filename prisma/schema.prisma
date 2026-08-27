@@ -1,0 +1,656 @@
+// =====================================================================
+// POSTYAR — Prisma schema (SQLite dev / MariaDB 10 prod-compatible)
+// All money fields are integer minor units (Rial). No floats.
+// All timestamps UTC. UI converts to Jalali.
+// =====================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------
+// AUTH & USERS
+// ---------------------------------------------------------------------
+model User {
+  id            String   @id @default(cuid())
+  email         String   @unique
+  mobile        String   @unique
+  passwordHash  String?
+  firstName     String
+  lastName      String
+  activityType  String   @default("other")   // personal/business/marketer/...
+  businessName  String   @default("")
+  role          String   @default("user")    // user | support | admin
+  status        String   @default("active")  // active | suspended
+  referralCode  String   @unique
+  referredById  String?
+  referredBy    User?    @relation("Referrals", fields: [referredById], references: [id])
+  referrals     User[]   @relation("Referrals")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  profile       Profile?
+  sessions      Session[]
+  otps          Otp[]
+  content       Content[]
+  destinations  Destination[]
+  bots          Bot[]
+  orders        Order[]
+  walletTxns    WalletTxn[]
+  ledger        LedgerEntry[]
+  subscriptions Subscription[]
+  notifications Notification[]
+  tickets       Ticket[]   @relation("UserTickets")
+  ticketReplies TicketReply[]
+  adCampaigns   AdCampaign[]
+  aiJobs        AiJob[]
+  botHistory    BotHistory[]
+  botLinkCodes  BotLinkCode[]
+  media         Media[]
+  auditLogs     AuditLog[]
+  supportActions Ticket[] @relation("SupportAssigned")
+  bankCards     BankCard[]
+  autoResponder AutoResponder?
+  goldBots      GoldBot[]
+  wooStores     WooCommerceStore[]
+  discountUsages DiscountUsage[]
+  referralRewardsGiven  ReferralReward[] @relation("ReferrerRewards")
+  referralRewardsReceived ReferralReward[] @relation("ReferredRewards")
+}
+
+model Profile {
+  userId        String   @id
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  avatarPath    String?
+  bio           String   @default("")
+  notifyPrefs   String   @default("{}") // JSON
+  updatedAt     DateTime @updatedAt
+}
+
+model Session {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash     String   @unique
+  ip            String?
+  userAgent     String?
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+  revokedAt     DateTime?
+
+  @@index([userId])
+}
+
+model Otp {
+  id            String   @id @default(cuid())
+  mobile        String
+  codeHash      String   // hashed; never store plaintext
+  purpose       String   @default("login") // login | register | reset
+  attempts      Int      @default(0)
+  consumedAt    DateTime?
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
+
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([mobile])
+}
+
+// ---------------------------------------------------------------------
+// CONTENT
+// ---------------------------------------------------------------------
+model Content {
+  id            String   @id @default(cuid())
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title         String
+  body          String   @default("")
+  status        String   @default("draft") // draft|scheduled|queued|processing|delivered|failed|cancelled
+  mediaIds      String   @default("[]")     // JSON of Media.id
+  destinationIds String  @default("[]")     // JSON of Destination.id
+  buttonPresetId String?
+  scheduledAt   DateTime?
+  publishedAt   DateTime?
+  failureReason  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  jobs          PublishJob[]
+  @@index([ownerId])
+  @@index([status])
+}
+
+model Media {
+  id            String   @id @default(cuid())
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  kind          String   // image|video
+  storagePath   String   // private storage path (randomized)
+  publicId      String   @unique // randomized filename
+  mime          String
+  sizeBytes     Int
+  width         Int?
+  height        Int?
+  createdAt     DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------
+// DESTINATIONS (Telegram / Bale / Rubika)
+// ---------------------------------------------------------------------
+model Destination {
+  id            String   @id @default(cuid())
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  provider      String   // telegram|bale|rubika
+  label         String
+  botTokenEnc   String   // AES-GCM encrypted
+  chatId        String
+  config        String   @default("{}") // JSON
+  status        String   @default("active") // active|inactive|error
+  lastError     String?
+  lastCheckedAt DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  buttons       GlassButton[]
+  jobs          PublishJob[]
+  botBots       Bot[]    @relation("BotDestinations")
+  @@index([ownerId])
+}
+
+model GlassButton {
+  id            String   @id @default(cuid())
+  destinationId String
+  destination   Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  label         String
+  url           String?
+  callbackData  String?
+  rowOrder      Int      @default(0)
+  enabled       Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([destinationId])
+}
+
+// ---------------------------------------------------------------------
+// PUBLISH QUEUE / WORKER
+// ---------------------------------------------------------------------
+model PublishJob {
+  id            String   @id @default(cuid())
+  contentId     String
+  content       Content  @relation(fields: [contentId], references: [id], onDelete: Cascade)
+  destinationId String
+  destination   Destination @relation(fields: [destinationId], references: [id], onDelete: Cascade)
+  status        String   @default("queued") // queued|locked|processing|delivered|failed|cancelled
+  runAt         DateTime @default(now())
+  lockedAt      DateTime?
+  lockedBy      String?
+  attempts      Int      @default(0)
+  maxAttempts   Int      @default(3)
+  idempotencyKey String  @unique
+  resultPayload String?  // JSON
+  failureReason String?
+  deliveredAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([status, runAt])
+  @@index([destinationId])
+}
+
+// ---------------------------------------------------------------------
+// PLANS / SUBSCRIPTIONS / QUOTA
+// ---------------------------------------------------------------------
+model Plan {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  nameFa        String
+  descriptionFa String   @default("")
+  priceRials    Int      @default(0)
+  intervalMonths Int     @default(1)
+  quota         String   @default("{}") // JSON: { publishPerMonth, aiPerMonth, channels, automation, ... }
+  active        Boolean  @default(true)
+  isPublic      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  subscriptions Subscription[]
+  discounts     DiscountPlan[]
+}
+
+model Subscription {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  planId        String
+  plan          Plan     @relation(fields: [planId], references: [id])
+  status        String   @default("active") // active|expired|cancelled
+  startedAt     DateTime @default(now())
+  endsAt        DateTime
+  usedQuota     String   @default("{}") // JSON
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------
+// PAYMENT / WALLET / LEDGER
+// ---------------------------------------------------------------------
+model Order {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  kind          String   // subscription|wallet_credit|ad_campaign
+  amountRials   Int
+  planId        String?
+  descriptionFa String  @default("")
+  status        String   @default("pending") // pending|awaiting_payment|awaiting_review|paid|rejected|failed|expired
+  provider      String?  // card|bank|bale
+  providerRef   String?  // provider invoice/authority id
+  idempotencyKey String  @unique
+  metadata      String   @default("{}")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  ledger        LedgerEntry[]
+  walletTxns    WalletTxn[]
+  cardReceipt   CardTransferReceipt?
+  bankRef       BankGatewayRef?
+  baleRef       BalePaymentRef?
+  @@index([userId])
+  @@index([status])
+}
+
+model CardTransferReceipt {
+  id            String   @id @default(cuid())
+  orderId       String   @unique
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  storagePath   String   // private storage
+  publicId      String   @unique
+  senderCardMask String? // masked
+  trackedSenderMobile String?
+  adminNotes    String?
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  status        String   @default("pending") // pending|approved|rejected
+  createdAt     DateTime @default(now())
+}
+
+model BankGatewayRef {
+  id            String   @id @default(cuid())
+  orderId       String   @unique
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  authority     String   @unique
+  mode          String   // direct|intermediary
+  verifyRefId   String?
+  traceNo       String?
+  paidAt        DateTime?
+  rawResponse   String?   // JSON for audit
+  createdAt     DateTime @default(now())
+}
+
+model BalePaymentRef {
+  id            String   @id @default(cuid())
+  orderId       String   @unique
+  order         Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  botId         String?  // which bot issued the invoice
+  chargeId      String?  @unique  // Bale successful_payment.charge_id
+  updateId      String?  @unique  // dedup key
+  currency      String?
+  providerPaymentChargeId String?
+  paidAt        DateTime?
+  rawPayload    String?  // sanitized JSON for audit
+  createdAt     DateTime @default(now())
+}
+
+model WalletTxn {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amountRials   Int      // + credit, - debit
+  direction     String   // credit|debit
+  reason        String   // payment|refund|referral|admin_adjust|ad_campaign|subscription
+  orderId       String?
+  order         Order?   @relation(fields: [orderId], references: [id])
+  balanceAfter  Int
+  idempotencyKey String  @unique
+  createdAt     DateTime @default(now())
+  @@index([userId])
+}
+
+model LedgerEntry {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId       String?
+  order         Order?   @relation(fields: [orderId], references: [id])
+  eventType     String   // payment|credit|debit|refund|referral_reward|admin_adjust
+  amountRials   Int      // signed
+  currency      String   @default("IRR")
+  idempotencyKey String  @unique
+  createdAt     DateTime @default(now())
+  @@index([userId])
+}
+
+model BankCard {
+  id            String   @id @default(cuid())
+  userId        String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  cardNumberMask String  // stored masked only (1234-****-****-5678)
+  holderName   String
+  bankName     String
+  active       Boolean  @default(true)
+  createdAt    DateTime @default(now())
+}
+
+model Discount {
+  id            String   @id @default(cuid())
+  code          String   @unique
+  kind          String   // percent|fixed
+  value         Int      // percent: 0..100 ; fixed: rials
+  maxUses       Int      @default(0) // 0 = unlimited
+  uses          Int      @default(0)
+  perUserLimit  Int      @default(1)
+  expiresAt    DateTime?
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  plans         DiscountPlan[]
+  usages        DiscountUsage[]
+}
+
+model DiscountPlan {
+  id            String   @id @default(cuid())
+  discountId    String
+  discount      Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  planId        String
+  plan          Plan     @relation(fields: [planId], references: [id])
+  @@unique([discountId, planId])
+}
+
+model DiscountUsage {
+  id            String   @id @default(cuid())
+  discountId    String
+  discount      Discount @relation(fields: [discountId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  orderId       String?
+  createdAt     DateTime @default(now())
+  @@unique([discountId, userId])
+}
+
+// ---------------------------------------------------------------------
+// REFERRAL
+// ---------------------------------------------------------------------
+model ReferralReward {
+  id            String   @id @default(cuid())
+  referrerId    String
+  referrer      User     @relation("ReferrerRewards", fields: [referrerId], references: [id], onDelete: Cascade)
+  referredId    String   @unique // one reward per referred user
+  referred      User     @relation("ReferredRewards", fields: [referredId], references: [id], onDelete: Cascade)
+  amountRials   Int
+  status        String   @default("paid") // paid|reversed
+  idempotencyKey String  @unique
+  createdAt     DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------
+// ADVERTISING
+// ---------------------------------------------------------------------
+model AdCampaign {
+  id            String   @id @default(cuid())
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  title         String
+  descriptionFa String   @default("")
+  link          String?
+  imagePath     String?  // public webp under /assets/ads/
+  placement     String   @default("site_sidebar") // site_sidebar|landing|...
+  startAt       DateTime?
+  endAt         DateTime?
+  priceRials    Int      @default(0)
+  status        String   @default("pending") // pending|approved|running|completed|rejected|cancelled
+  impressions   Int      @default(0)
+  clicks        Int      @default(0)
+  adminNotes    String?
+  reviewedBy    String?
+  reviewedAt    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@index([status])
+}
+
+// ---------------------------------------------------------------------
+// AI
+// ---------------------------------------------------------------------
+model AiJob {
+  id            String   @id @default(cuid())
+  userId        String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider      String   // openai|gemini|grok|deepseek|anthropic|openrouter|mistral|together|ollama
+  model         String
+  task          String   // caption|text|reply|custom
+  prompt        String
+  output        String?
+  tokensIn      Int      @default(0)
+  tokensOut     Int      @default(0)
+  status        String   @default("completed") // queued|processing|completed|failed
+  failureReason String?
+  idempotencyKey String  @unique
+  createdAt     DateTime @default(now())
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------
+// GOLD
+// ---------------------------------------------------------------------
+model GoldPrice {
+  id            String   @id @default(cuid())
+  instrument    String   // 18k|emami|bahar_azadi|ounce
+  priceRials    Int
+  fetchedAt     DateTime @default(now())
+  source        String
+  @@index([instrument, fetchedAt])
+}
+
+model GoldBot {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled       Boolean  @default(false)
+  instrument    String   @default("18k")
+  direction     String   @default("up") // up|down|both
+  thresholdPct  Int      @default(2)
+  intervalMin   Int      @default(15)
+  destinationId String?
+  lastFiredAt   DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------
+// WOOCOMMERCE
+// ---------------------------------------------------------------------
+model WooCommerceStore {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  storeUrl      String
+  consumerKeyEnc String
+  consumerSecretEnc String
+  status        String   @default("active")
+  lastSyncAt    DateTime?
+  createdAt     DateTime @default(now())
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------
+// TICKETS
+// ---------------------------------------------------------------------
+model Ticket {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation("UserTickets", fields: [userId], references: [id], onDelete: Cascade)
+  subject       String
+  category      String   @default("general")
+  status        String   @default("open") // open|answered|closed
+  priority      String   @default("normal") // low|normal|high
+  assignedToId  String?
+  assignedTo    User?    @relation("SupportAssigned", fields: [assignedToId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  replies       TicketReply[]
+  @@index([userId])
+}
+
+model TicketReply {
+  id            String   @id @default(cuid())
+  ticketId      String
+  ticket        Ticket   @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  body          String
+  isStaff       Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  @@index([ticketId])
+}
+
+// ---------------------------------------------------------------------
+// NOTIFICATIONS
+// ---------------------------------------------------------------------
+model Notification {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category      String   // publish|payment|subscription|referral|ad|ticket|gold|woo|security|system
+  titleFa       String
+  bodyFa        String
+  link          String?
+  readAt        DateTime?
+  createdAt     DateTime @default(now())
+  @@index([userId])
+}
+
+// ---------------------------------------------------------------------
+// BOT BUILDER
+// ---------------------------------------------------------------------
+model Bot {
+  id            String   @id @default(cuid())
+  ownerId       String
+  owner         User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  provider      String   // telegram|bale|rubika
+  name          String
+  username      String?
+  botTokenEnc   String   // AES-GCM
+  status        String   @default("inactive") // active|inactive|error
+  lastError     String?
+  webhookSecret String?  // not exposed via URL; hmac of incoming
+  config        String   @default("{}") // JSON: welcome, menu, commands, ...
+  destinationId String?
+  destination   Destination? @relation("BotDestinations", fields: [destinationId], references: [id])
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  linkCodes     BotLinkCode[]
+  history       BotHistory[]
+  workflows     BotWorkflow[]
+  @@index([ownerId])
+}
+
+model BotWorkflow {
+  id            String   @id @default(cuid())
+  botId         String
+  bot           Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  name          String
+  enabled       Boolean  @default(true)
+  steps         String   @default("[]") // JSON
+  triggerKind   String   @default("message") // message|command|callback
+  triggerValue  String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+model BotLinkCode {
+  id            String   @id @default(cuid())
+  botId         String
+  bot           Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash      String   @unique
+  expiresAt     DateTime
+  consumedAt    DateTime?
+  consumedByProviderUserId String?
+  createdAt     DateTime @default(now())
+  @@index([botId])
+}
+
+model BotHistory {
+  id            String   @id @default(cuid())
+  botId         String
+  bot           Bot      @relation(fields: [botId], references: [id], onDelete: Cascade)
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  direction     String   // inbound|outbound
+  providerUserId String?
+  text          String
+  raw           String?  // sanitized JSON
+  createdAt     DateTime @default(now())
+  @@index([botId])
+}
+
+model AutoResponder {
+  id            String   @id @default(cuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  enabled       Boolean  @default(false)
+  destinationId String?
+  rules         String   @default("[]") // JSON
+  fallbackFa    String   @default("")
+  aiProvider    String?
+  aiModel       String?
+  loopGuardSeconds Int  @default(60)
+  dailyLimit    Int      @default(100)
+  usedToday     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  @@unique([userId])
+}
+
+// ---------------------------------------------------------------------
+// AUDIT / OBSERVABILITY
+// ---------------------------------------------------------------------
+model AuditLog {
+  id            String   @id @default(cuid())
+  userId        String?
+  user          User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  actor         String   // user|system|admin|provider|webhook
+  action        String
+  targetType    String?
+  targetId      String?
+  ip            String?
+  meta          String   @default("{}") // sanitized JSON
+  createdAt     DateTime @default(now())
+  @@index([userId])
+  @@index([action])
+}
+
+model SystemSetting {
+  id            String   @id @default(cuid())
+  key           String   @unique
+  value         String
+  updatedAt     DateTime @updatedAt
+}
+
+// ---------------------------------------------------------------------
+// HEALTH
+// ---------------------------------------------------------------------
+model HealthCheck {
+  id            String   @id @default(cuid())
+  component     String   // app|db|redis|queue|worker|storage|provider
+  status        String   // ok|warn|down
+  message       String?
+  checkedAt     DateTime @default(now())
+  @@index([component, checkedAt])
+}

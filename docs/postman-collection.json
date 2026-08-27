@@ -1,0 +1,1988 @@
+{
+  "info": {
+    "name": "POSTYAR API",
+    "_postman_id": "postyar-api-collection",
+    "description": "POSTYAR — Integrator's API collection. Includes all major endpoints: auth, plans, destinations, content, bots, payments, wallet, AI, gold, woo, tickets, admin.\n\nVariables:\n- `baseUrl` — e.g. https://postyar.example\n- `cronSecret` — POSTYAR_CRON_SECRET env value (for cron-protected endpoints)\n- `botId`, `orderId`, `destinationId`, `contentId`, `ticketId` — runtime placeholders; fill them after creating the corresponding resources.\n\nAll authenticated endpoints use a `postyar_sid` HttpOnly cookie. After login, the cookie is automatically stored by Postman.\n\nPersian + RTL notes:\n- Error responses use `errorFa` (Persian) field, not `error`.\n- All money is integer Rial minor units (no floats).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://postyar.example",
+      "type": "string"
+    },
+    {
+      "key": "cronSecret",
+      "value": "replace-with-POSTYAR_CRON_SECRET",
+      "type": "string"
+    },
+    {
+      "key": "botId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "orderId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "destinationId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "contentId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ticketId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "mediaId",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "auth": {
+    "type": "apikey",
+    "apikey": [
+      { "key": "in", "value": "cookie", "type": "string" },
+      { "key": "value", "value": "postyar_sid={{postyar_sid}}", "type": "string" }
+    ]
+  },
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Public health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Admin health check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "health"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register (email + password)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"نام\",\n  \"lastName\": \"نام‌خانوادگی\",\n  \"email\": \"user@example.com\",\n  \"mobile\": \"09123456789\",\n  \"password\": \"super-secret-pass\",\n  \"activityType\": \"business\",\n  \"businessName\": \"شرکت نمونه\",\n  \"referralCode\": \"ABC123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Login (email + password)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.ok) {",
+                  "  pm.collectionVariables.set('userId', json.user.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"super-secret-pass\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Request OTP",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"09123456789\",\n  \"purpose\": \"login\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/otp-request",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "otp-request"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Verify OTP (login)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mobile\": \"09123456789\",\n  \"code\": \"123456\",\n  \"purpose\": \"login\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/otp-verify",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "otp-verify"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get current user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Change password",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"currentPassword\": \"super-secret-pass\",\n  \"newPassword\": \"new-super-secret-pass\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me/password",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me", "password"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get profile",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me", "profile"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update profile",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"نام جدید\",\n  \"businessName\": \"شرکت جدید\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me/profile",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me", "profile"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get notification prefs",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me/notify-prefs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me", "notify-prefs"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update notification prefs",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"system\": true,\n  \"billing\": true,\n  \"subscription\": true,\n  \"content\": true,\n  \"referral\": true,\n  \"marketing\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me/notify-prefs",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me", "notify-prefs"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sign out",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/signout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "signout"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Plans",
+      "item": [
+        {
+          "name": "List public plans",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "plans"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Destinations",
+      "item": [
+        {
+          "name": "List my destinations",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/destinations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "destinations"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create destination",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.destination) {",
+                  "  pm.collectionVariables.set('destinationId', json.destination.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"telegram\",\n  \"label\": \"کانال اصلی\",\n  \"botToken\": \"<BOT_TOKEN>\",\n  \"chatId\": \"-1001234567890\",\n  \"config\": {}\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/destinations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "destinations"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get single destination",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/destinations/{{destinationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "destinations", "{{destinationId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update destination (rotate token)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"botToken\": \"<NEW_BOT_TOKEN>\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/destinations/{{destinationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "destinations", "{{destinationId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Soft-delete destination",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/destinations/{{destinationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "destinations", "{{destinationId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List destination buttons",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/destinations/{{destinationId}}/buttons",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "destinations", "{{destinationId}}", "buttons"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create destination button",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"label\": \"مشاهده وب‌سایت\",\n  \"url\": \"https://example.com\",\n  \"rowOrder\": 0,\n  \"enabled\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/destinations/{{destinationId}}/buttons",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "destinations", "{{destinationId}}", "buttons"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Content",
+      "item": [
+        {
+          "name": "List content (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/content?page=1&pageSize=20&status=draft&q=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" },
+                { "key": "status", "value": "draft" },
+                { "key": "q", "value": "" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create draft content",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.content) {",
+                  "  pm.collectionVariables.set('contentId', json.content.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"تیتر پست\",\n  \"body\": \"متن پست...\",\n  \"mediaIds\": [],\n  \"destinationIds\": []\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/content",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get single content",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/content/{{contentId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "content", "{{contentId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Schedule publish (now)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contentId\": \"{{contentId}}\",\n  \"destinationIds\": [\"{{destinationId}}\"],\n  \"scheduledAtJalali\": \"now\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/publish/schedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "publish", "schedule"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Schedule publish (Jalali future)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"contentId\": \"{{contentId}}\",\n  \"destinationIds\": [\"{{destinationId}}\"],\n  \"scheduledAtJalali\": {\n    \"jy\": 1404,\n    \"jm\": 1,\n    \"jd\": 1,\n    \"hour\": 10,\n    \"minute\": 30\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/publish/schedule",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "publish", "schedule"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Media",
+      "item": [
+        {
+          "name": "Upload image (multipart)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.id) {",
+                  "  pm.collectionVariables.set('mediaId', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "/path/to/image.jpg" },
+                { "key": "kind", "type": "text", "value": "image" }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/media-upload",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "media-upload"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Download media (auth-gated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/media/{{mediaId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "media", "{{mediaId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Bots",
+      "item": [
+        {
+          "name": "List my bots",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bots",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create bot",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.bot) {",
+                  "  pm.collectionVariables.set('botId', json.bot.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"telegram\",\n  \"name\": \"ربات پشتیبانی\",\n  \"botToken\": \"<BOT_TOKEN>\",\n  \"username\": \"my_bot\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bots",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get single bot",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bots/{{botId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots", "{{botId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Activate bot (register webhook)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bots/{{botId}}/activate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots", "{{botId}}", "activate"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Deactivate bot (delete webhook)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bots/{{botId}}/deactivate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots", "{{botId}}", "deactivate"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generate link code",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bots/{{botId}}/link-code",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots", "{{botId}}", "link-code"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List link codes (status only)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bots/{{botId}}/link-codes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots", "{{botId}}", "link-codes"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Broadcast to bot audience",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"پیام همگانی\",\n  \"audienceProviderUserIds\": [\"123456789\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bots/{{botId}}/broadcast",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots", "{{botId}}", "broadcast"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Bot history (paginated)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bots/{{botId}}/history?page=1&pageSize=50&direction=inbound",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots", "{{botId}}", "history"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "50" },
+                { "key": "direction", "value": "inbound" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List bot workflows",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bots/{{botId}}/workflows",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots", "{{botId}}", "workflows"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create bot workflow",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"جواب سلام\",\n  \"enabled\": true,\n  \"steps\": [],\n  \"triggerKind\": \"command\",\n  \"triggerValue\": \"start\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bots/{{botId}}/workflows",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots", "{{botId}}", "workflows"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Poll bot (admin-only, fallback)",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/bots/{{botId}}/poll?offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots", "{{botId}}", "poll"],
+              "query": [
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Payments",
+      "item": [
+        {
+          "name": "List my orders",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create subscription order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.order) {",
+                  "  pm.collectionVariables.set('orderId', json.order.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kind\": \"subscription\",\n  \"planId\": \"<PLAN_ID>\",\n  \"provider\": \"card\",\n  \"idempotencyKey\": \"order-sub-1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create wallet-credit order",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.order) {",
+                  "  pm.collectionVariables.set('orderId', json.order.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kind\": \"wallet_credit\",\n  \"amount\": 10000000,\n  \"provider\": \"card\",\n  \"idempotencyKey\": \"order-wallet-1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/orders",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get single order (with refs)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/orders/{{orderId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "orders", "{{orderId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List available bank cards",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/card",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "card"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Submit card-to-card receipt",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"mediaId\": \"{{mediaId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/card/receipt",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "card", "receipt"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create bank gateway request",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"mode\": \"direct\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/bank",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "bank"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Bank callback (HTTP-redirect)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/bank/callback?order={{orderId}}&state=<STATE>&authority=<AUTHORITY>&status=OK",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "bank", "callback"],
+              "query": [
+                { "key": "order", "value": "{{orderId}}" },
+                { "key": "state", "value": "<STATE>" },
+                { "key": "authority", "value": "<AUTHORITY>" },
+                { "key": "status", "value": "OK" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create Bale wallet invoice",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"botId\": \"{{botId}}\",\n  \"chatId\": \"<CHAT_ID>\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/payments/bale",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "payments", "bale"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Wallet / Ledger / Referral / Discount",
+      "item": [
+        {
+          "name": "Get wallet balance + history",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/wallet?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "wallet"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get ledger entries",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ledger?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ledger"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get referral stats",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/referral",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "referral"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Preview discount",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/discounts?code=SAVE10&amount=200000000&planId=<PLAN_ID>",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "discounts"],
+              "query": [
+                { "key": "code", "value": "SAVE10" },
+                { "key": "amount", "value": "200000000" },
+                { "key": "planId", "value": "<PLAN_ID>" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get my subscription + quota",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/subscriptions",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "subscriptions"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "AI",
+      "item": [
+        {
+          "name": "Generate text",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mode\": \"generate\",\n  \"opts\": {\n    \"topic\": \"معرفی محصولات جدید\",\n    \"tone\": \"promotional\",\n    \"maxLength\": 1000\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/ai/generate-text",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ai", "generate-text"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Generate caption",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"topic\": \"معرفی محصولات جدید\",\n  \"tone\": \"promotional\",\n  \"length\": \"medium\",\n  \"platform\": \"telegram\",\n  \"purpose\": \"sale\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/ai/generate-caption",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ai", "generate-caption"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Smart reply",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"قیمت چنده؟\",\n  \"context\": {\n    \"channel\": \"telegram\",\n    \"recentThread\": [\n      { \"role\": \"user\", \"text\": \"سلام\" },\n      { \"role\": \"assistant\", \"text\": \"سلام، چطور می‌تونم کمکت کنم؟\" }\n    ]\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/ai/smart-reply",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ai", "smart-reply"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Auto-responder (GET)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auto-responder",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auto-responder"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Auto-responder (PATCH)",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": true,\n  \"rules\": [\n    {\n      \"keywords\": [\"قیمت\", \"چنده\"],\n      \"matchMode\": \"contains\",\n      \"responseMode\": \"static\",\n      \"staticResponse\": \"برای اطلاع از قیمت‌ها به سایت مراجعه کنید.\"\n    }\n  ],\n  \"fallbackFa\": \"پیام شما دریافت شد. به‌زودی پاسخ می‌دهیم.\",\n  \"dailyLimit\": 100,\n  \"loopGuardSeconds\": 60\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auto-responder",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auto-responder"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Inbox threads",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/inbox",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inbox"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Inbox thread messages",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/inbox/{{botId}}:123456789?page=1&pageSize=50",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inbox", "{{botId}}:123456789"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "50" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reply to inbox thread",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"message\": \"سلام! پیام شما دریافت شد.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inbox/{{botId}}:123456789",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inbox", "{{botId}}:123456789"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Gold",
+      "item": [
+        {
+          "name": "Get all gold prices",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/gold",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "gold"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get specific gold price",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/gold?instrument=18k",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "gold"],
+              "query": [
+                { "key": "instrument", "value": "18k" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List my gold bots",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/gold/bot",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "gold", "bot"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create gold bot",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": true,\n  \"instrument\": \"18k\",\n  \"direction\": \"both\",\n  \"thresholdPct\": 2,\n  \"intervalMin\": 15,\n  \"destinationId\": \"{{destinationId}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/gold/bot",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "gold", "bot"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "WooCommerce",
+      "item": [
+        {
+          "name": "List my woo stores",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/woo/stores",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "woo", "stores"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create woo store",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"storeUrl\": \"https://shop.example.com\",\n  \"consumerKey\": \"ck_xxx\",\n  \"consumerSecret\": \"cs_xxx\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/woo/stores",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "woo", "stores"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Sync woo store products → content drafts",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/woo/stores/<STORE_ID>/sync",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "woo", "stores", "<STORE_ID>", "sync"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Tickets",
+      "item": [
+        {
+          "name": "List my tickets",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets?limit=50&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create ticket",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "var json = pm.response.json();",
+                  "if (json && json.ticket) {",
+                  "  pm.collectionVariables.set('ticketId', json.ticket.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"subject\": \"مشکل در شارژ کیف پول\",\n  \"body\": \"شارژ من اعمال نشد.\",\n  \"category\": \"billing\",\n  \"priority\": \"normal\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get single ticket",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "{{ticketId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reply to ticket",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"body\": \"ممنون، منتظر پاسخ هستم.\",\n  \"close\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/tickets/{{ticketId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "tickets", "{{ticketId}}"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Ads",
+      "item": [
+        {
+          "name": "List my ads",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/ads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ads"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create ad draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"تبلیغ فرم نظرخواهی\",\n  \"descriptionFa\": \"تا ۱۰٪ تخفیف ویژه پاییز\",\n  \"link\": \"https://example.com\",\n  \"placement\": \"site_sidebar\",\n  \"priceRials\": 50000000\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/ads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "ads"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "List notifications",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications?limit=50&offset=0&unreadOnly=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notifications"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" },
+                { "key": "unreadOnly", "value": "0" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark one read",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notificationId\": \"<NOTIF_ID>\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notifications"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Mark all read",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"all\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notifications"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Unread count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/notifications/unread-count",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "notifications", "unread-count"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Cron-protected",
+      "item": [
+        {
+          "name": "Run publish worker (cron)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-postyar-cron-secret", "value": "{{cronSecret}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/publish/run?batch=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "publish", "run"],
+              "query": [
+                { "key": "batch", "value": "5" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Rubika poll (cron)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-postyar-cron-secret", "value": "{{cronSecret}}" },
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"botId\": \"{{botId}}\",\n  \"lastUpdateId\": 0\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/bots/incoming/rubika?bid=auto",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "bots", "incoming", "rubika"],
+              "query": [
+                { "key": "bid", "value": "auto" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Gold bot eval (cron, not yet wired)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "x-postyar-cron-secret", "value": "{{cronSecret}}" }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/gold/bot/eval",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "gold", "bot", "eval"]
+            }
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "List users",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users?limit=50&offset=0&search=&status=&role=",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get single user (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users", "{{userId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update user status/role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"active\",\n  \"role\": \"user\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/users/{{userId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "users", "{{userId}}"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List plans (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "plans"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create plan",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"enterprise\",\n  \"nameFa\": \"سازمانی-ویژه\",\n  \"descriptionFa\": \"طرح اختصاصی\",\n  \"priceRials\": 5000000000,\n  \"intervalMonths\": 1,\n  \"quota\": { \"publishPerMonth\": 5000, \"aiPerMonth\": 25000, \"channels\": 30, \"automation\": 10 },\n  \"active\": true,\n  \"isPublic\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/plans",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "plans"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve card order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"رسید تأیید شد.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/{{orderId}}/approve",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "orders", "{{orderId}}", "approve"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Reject card order",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"notes\": \"رسید نامعتبر است.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/orders/{{orderId}}/reject",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "orders", "{{orderId}}", "reject"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Wallet adjust (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": \"{{userId}}\",\n  \"amount\": 1000000,\n  \"reason\": \"پاداش دستی\",\n  \"idempotencyKey\": \"admin-adjust-001\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/wallet/adjust",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "wallet", "adjust"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List discounts (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/discounts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "discounts"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Create discount",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"SAVE10\",\n  \"kind\": \"percent\",\n  \"value\": 10,\n  \"maxUses\": 100,\n  \"perUserLimit\": 1,\n  \"expiresAt\": \"2025-12-31T23:59:59Z\",\n  \"active\": true,\n  \"planIds\": [\"<PLAN_ID>\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/discounts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "discounts"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List bank cards (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/bank-cards",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "bank-cards"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Add bank card",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"cardNumber\": \"6037-9911-2345-6789\",\n  \"holderName\": \"نام صاحب\",\n  \"bankName\": \"ملت\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/bank-cards",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "bank-cards"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List subscriptions (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/subscriptions?page=1&pageSize=20",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "subscriptions"],
+              "query": [
+                { "key": "page", "value": "1" },
+                { "key": "pageSize", "value": "20" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List ads (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/ads",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "ads"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Approve ad",
+          "request": {
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/ads/<AD_ID>/approve",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "ads", "<AD_ID>", "approve"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List bots (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/bots",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "bots"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List tickets (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/tickets?limit=50&offset=0&status=open",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "tickets"],
+              "query": [
+                { "key": "limit", "value": "50" },
+                { "key": "offset", "value": "0" },
+                { "key": "status", "value": "open" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Assign ticket",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"{{ticketId}}\",\n  \"supportUserId\": \"<SUPPORT_USER_ID>\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/tickets",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "tickets"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Audit log (filtered)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/audit?action=login&actor=user&targetType=user&limit=100&offset=0",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "audit"],
+              "query": [
+                { "key": "action", "value": "login" },
+                { "key": "actor", "value": "user" },
+                { "key": "targetType", "value": "user" },
+                { "key": "limit", "value": "100" }
+              ]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List woo stores (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/woo",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "woo"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "List gold bots (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/gold",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "gold"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Broadcast notification (admin)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"filter\": \"all\",\n  \"titleFa\": \"اطلاعیه سیستم\",\n  \"bodyFa\": \"سرویس ساعات ۲ تا ۴ بامداد آفلاین می‌شود.\",\n  \"link\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/notifications/broadcast",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "notifications", "broadcast"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Get system settings (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "settings"]
+            }
+          },
+          "response": []
+        },
+        {
+          "name": "Update system setting",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key\": \"maintenance.messageFa\",\n  \"value\": \"به‌دلیل تعمیرات، سرویس موقتاً قطع است.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/admin/settings",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "admin", "settings"]
+            }
+          },
+          "response": []
+        }
+      ]
+    }
+  ]
+}

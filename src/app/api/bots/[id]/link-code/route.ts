@@ -1,0 +1,47 @@
+// POSTYAR — /api/bots/[id]/link-code
+// POST: generate a fresh link code. Returns the plaintext code (one-time).
+import { NextResponse } from "next/server";
+import { db } from "@/lib/db";
+import {
+  requireUser,
+  clientIp,
+  AuthError,
+} from "@/lib/server/auth";
+import { generateLinkCode } from "@/lib/bots/link";
+
+export async function POST(
+  req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  let user;
+  try { user = await requireUser(); } catch (e) {
+    return NextResponse.json({ errorFa: (e as AuthError).message }, { status: (e as AuthError).status });
+  }
+  const { id } = await params;
+  // Verify ownership before issuing
+  const bot = await db.bot.findFirst({ where: { id, ownerId: user.id } });
+  if (!bot) {
+    return NextResponse.json({ errorFa: "ربات یافت نشد." }, { status: 404 });
+  }
+  try {
+    const r = await generateLinkCode({ botId: id, userId: user.id });
+    return NextResponse.json({
+      ok: true,
+      code: r.code,
+      expiresAt: r.expiresAt.toISOString(),
+      linkCodeId: r.linkCodeId,
+      // One-time display — never returned again by any other endpoint.
+      instructionsFa:
+        "این کد را در چت ربات وارد کنید تا حساب پُست‌یار شما به آن متصل شود. " +
+        "کد تنها برای ده دقیقه معتبر است و فقط یک‌بار قابل استفاده است.",
+    }, { status: 201 });
+  } catch (err) {
+    const e = err as AuthError;
+    return NextResponse.json(
+      { errorFa: e.message ?? "صدور کد اتصال ناموفق بود." },
+      { status: e.status ?? 400 },
+    );
+  }
+  // clientIp captured for audit inside generateLinkCode (via audit()).
+  void clientIp;
+}
