@@ -60,6 +60,7 @@ server.log
 /db/*.db-journal
 /db/*.db-wal
 /db/*.db-shm
+/db/test.db*
 /upload/
 /.next/standalone
 agent-ctx/

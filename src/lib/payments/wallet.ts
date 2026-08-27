@@ -193,7 +193,20 @@ export async function adminAdjustWallet(input: {
       },
     });
 
-    return { walletTxn, balanceAfter };
+    // Idempotent re-entry guard: if the upsert above was a no-op (the
+    // idempotencyKey already existed), `balanceAfter` above reflects the
+    // HYPOTHETICAL balance as if the txn were applied again — which is
+    // wrong. Recompute the ACTUAL balance from the WalletTxn sum so
+    // callers always see the true balance (addendum §8 — derived
+    // balance, no false duplicates).
+    const postTxns = await tx.walletTxn.findMany({
+      where: { userId: input.userId },
+      select: { amountRials: true, direction: true },
+    });
+    let actualBalance = 0;
+    for (const t of postTxns) actualBalance += t.direction === "credit" ? t.amountRials : -t.amountRials;
+
+    return { walletTxn, balanceAfter: actualBalance };
   });
 
   await audit({
@@ -228,6 +241,22 @@ export async function refund(input: {
   }
   if (input.amount > order.amountRials) {
     throw new Error("مبلغ بازگشتی بیشتر از مبلغ سفارش است.");
+  }
+  // Balance guard: never let the wallet go negative on a refund. The
+  // balance is derived from the WalletTxn sum; refunding more than the
+  // user currently holds would push the running balance below zero,
+  // which is a financial anomaly (addendum §8 — exact monetary
+  // integrity). Compute the pre-refund balance and reject if
+  // insufficient. The check happens BEFORE the $transaction so a
+  // rejected refund leaves no row behind.
+  const pre = await db.walletTxn.findMany({
+    where: { userId: order.userId },
+    select: { amountRials: true, direction: true },
+  });
+  let currentBalance = 0;
+  for (const t of pre) currentBalance += t.direction === "credit" ? t.amountRials : -t.amountRials;
+  if (currentBalance < input.amount) {
+    throw new Error("موجودی کیف پول برای بازگشت این مبلغ کافی نیست.");
   }
 
   const result = await db.$transaction(async (tx) => {
@@ -276,7 +305,17 @@ export async function refund(input: {
         link: `/wallet`,
       },
     });
-    return { balanceAfter };
+    // Idempotent re-entry: if the upsert no-op'd (duplicate idem key),
+    // `balanceAfter` above is the hypothetical balance, not the real
+    // one. Recompute from the WalletTxn sum (addendum §8 — derived
+    // balance, no false duplicates).
+    const postTxns = await tx.walletTxn.findMany({
+      where: { userId: order.userId },
+      select: { amountRials: true, direction: true },
+    });
+    let actualBalance = 0;
+    for (const t of postTxns) actualBalance += t.direction === "credit" ? t.amountRials : -t.amountRials;
+    return { balanceAfter: actualBalance };
   });
 
   await audit({

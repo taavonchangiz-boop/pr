@@ -162,6 +162,18 @@ const NAV: NavItem[] = [
 
 const ADMIN_GROUP_ITEMS = NAV.filter((n) => n.group === "admin");
 
+// Persian role labels (addendum §23 — no Latin role string in UI).
+// Technical identifiers remain Latin internally; only the rendered
+// label is localized.
+function roleFa(role: string | undefined | null): string {
+  switch (role) {
+    case "admin": return "مدیر";
+    case "support": return "پشتیبان";
+    case "user": return "کاربر";
+    default: return "—";
+  }
+}
+
 function SideNav({
   active,
   onNavigate,
@@ -461,7 +473,7 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
         </div>
         <div className="flex-1" />
         <div className="hidden text-xs text-muted-foreground sm:block">
-          کاربر: {userName} • نقش: {user?.role ?? "—"}
+          کاربر: {userName} • نقش: {roleFa(user?.role)}
         </div>
       </header>
 

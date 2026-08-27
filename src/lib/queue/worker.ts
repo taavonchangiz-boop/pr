@@ -273,7 +273,18 @@ async function processJob(
 async function failJob(job: { id: string; contentId: string; attempts: number }, reason: string): Promise<void> {
   await db.publishJob.update({
     where: { id: job.id },
-    data: { status: "failed", failureReason: reason.slice(0, 400), lockedBy: null, lockedAt: null },
+    data: {
+      status: "failed",
+      failureReason: reason.slice(0, 400),
+      lockedBy: null,
+      lockedAt: null,
+      // Persist the final attempt count so the DB row reflects the
+      // total number of tries (the caller computes `attempts =
+      // job.attempts + 1` before calling failJob, but the column was
+      // previously NOT updated on the exhausted path — leaving the
+      // row's `attempts` field stuck at the pre-final-attempt value).
+      attempts: job.attempts + 1,
+    },
   });
   // Mark Content.status = failed too, but ONLY if it was previously in
   // a processing/queued state and no other job is still queued/delivered.
