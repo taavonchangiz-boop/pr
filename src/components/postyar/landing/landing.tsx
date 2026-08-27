@@ -318,7 +318,7 @@ export function Landing({ navigate }: LandingProps) {
             </div>
             <span className="font-bold">پُست‌یار</span>
           </div>
-          <p>© {toPersianDigits(new Date().getFullYear())} پُست‌یار. تمامی حقوق محفوظ است.</p>
+          <p>© {toPersianDigits(new Date().getFullYear() - 621)} پُست‌یار. تمامی حقوق محفوظ است.</p>
           <p className="mt-1">ساخته‌شده با فونت وزیرمتن، تقویم جلالی و رابط راست‌چین.</p>
         </div>
       </footer>

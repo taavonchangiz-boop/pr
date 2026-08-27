@@ -246,7 +246,7 @@ export function Auth({ navigate }: AuthProps) {
       </main>
 
       <footer className="mt-auto border-t py-4 text-center text-xs text-muted-foreground">
-        © {toPersianDigits(new Date().getFullYear())} پُست‌یار
+        © {toPersianDigits(new Date().getFullYear() - 621)} پُست‌یار
       </footer>
     </div>
   );
