@@ -61,6 +61,7 @@ server.log
 /db/*.db-wal
 /db/*.db-shm
 /db/test.db*
+/public/assets/
 /upload/
 /.next/standalone
 agent-ctx/
