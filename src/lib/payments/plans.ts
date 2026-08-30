@@ -7,9 +7,30 @@
 // Persian + RTL + Jalali everywhere.
 // =====================================================================
 import { db } from "@/lib/db";
-import { safeJsonParse } from "@/lib/server/auth";
-import { AuthError } from "@/lib/server/auth";
 import { formatRials, toPersianDigits } from "@/lib/persian";
+
+// NOTE: `plans.ts` is imported by both server API routes AND client components
+// (e.g. admin/plans.tsx imports FEATURE_CATALOG). To keep it client-safe we
+// MUST NOT import from `@/lib/server/auth` (which pulls next/headers + ioredis)
+// or any other server-only module here. The two helpers below are inlined
+// copies of the ones in lib/server/auth.ts — kept local on purpose.
+export class AuthError extends Error {
+  status: number;
+  constructor(message: string, status: number = 400) {
+    super(message);
+    this.status = status;
+    this.name = "AuthError";
+  }
+}
+
+export function safeJsonParse<T>(s: string | null | undefined, fallback: T): T {
+  if (!s) return fallback;
+  try {
+    return JSON.parse(s) as T;
+  } catch {
+    return fallback;
+  }
+}
 
 // ---------------------------------------------------------------------
 // Quota shape (stored as JSON string in Plan.quota / Subscription.usedQuota)
@@ -30,6 +51,209 @@ export interface PlanQuota {
   automation?: number;
 }
 
+// =====================================================================
+// Granular plan features (ITEM 31).
+// ---------------------------------------------------------------------
+// `Plan.features` JSON stores `{ featureKey: boolean | number }`.
+// `PlanQuota` is kept for backward-compat with the legacy quota engine,
+// but `features` is the new source of truth for module gating.
+// =====================================================================
+
+/** Boolean feature toggles (presence => module is enabled). */
+export type PlanBooleanFeatureKey =
+  | "publish"
+  | "schedule"
+  | "multiChannel"
+  | "bot"
+  | "workflow"
+  | "linkCodes"
+  | "broadcast"
+  | "glassButtons"
+  | "caption"
+  | "smartText"
+  | "smartReply"
+  | "autoResponder"
+  | "inbox"
+  | "woo"
+  | "goldBot"
+  | "goldMonitor"
+  | "advertising"
+  | "referral"
+  | "wallet"
+  | "tickets"
+  | "stats"
+  | "automation"
+  | "apiAccess";
+
+/** Numeric quota features (0 = unlimited). */
+export type PlanNumericFeatureKey =
+  | "publishPerMonth"
+  | "aiPerMonth"
+  | "channels"
+  | "bots"
+  | "destinations"
+  | "contentItems"
+  | "glassButtonsPerDest"
+  | "workflowSteps";
+
+/** All known feature keys. */
+export type PlanFeatureKey = PlanBooleanFeatureKey | PlanNumericFeatureKey;
+
+/** JSON shape persisted in Plan.features. Values are `boolean` for the
+ *  keys in {@link PlanBooleanFeatureKey} and `number` for the keys in
+ *  {@link PlanNumericFeatureKey}. Per-key type enforcement is delegated
+ *  to the helper functions {@link getFeatureBoolean} / {@link getFeatureNumber}. */
+export type PlanFeatures = Partial<Record<PlanFeatureKey, boolean | number>>;
+
+export type PlanFeatureType = "boolean" | "number";
+
+export interface PlanFeatureDef {
+  key: PlanFeatureKey;
+  label: string;
+  type: PlanFeatureType;
+}
+
+export interface PlanFeatureGroup {
+  id: string;
+  title: string;
+  items: PlanFeatureDef[];
+}
+
+/** Source-of-truth catalog for the admin UI and the gating engine. */
+export const FEATURE_CATALOG: PlanFeatureGroup[] = [
+  {
+    id: "publishing",
+    title: "انتشار و محتوا",
+    items: [
+      { key: "publish", label: "انتشار محتوا", type: "boolean" },
+      { key: "schedule", label: "زمان‌بندی انتشار", type: "boolean" },
+      { key: "multiChannel", label: "انتشار چندکاناله", type: "boolean" },
+      { key: "publishPerMonth", label: "انتشار در ماه", type: "number" },
+      { key: "contentItems", label: "محتوای ذخیره‌شده", type: "number" },
+    ],
+  },
+  {
+    id: "bot",
+    title: "بات و اتوماسیون",
+    items: [
+      { key: "bot", label: "ساخت بات", type: "boolean" },
+      { key: "workflow", label: "گردش کار", type: "boolean" },
+      { key: "linkCodes", label: "کدهای اتصال", type: "boolean" },
+      { key: "broadcast", label: "پیام گروهی", type: "boolean" },
+      { key: "bots", label: "تعداد بات‌ها", type: "number" },
+      { key: "workflowSteps", label: "گام‌های گردش کار", type: "number" },
+      { key: "automation", label: "اتوماسیون", type: "boolean" },
+    ],
+  },
+  {
+    id: "ai",
+    title: "هوش مصنوعی",
+    items: [
+      { key: "caption", label: "کپشن هوشمند", type: "boolean" },
+      { key: "smartText", label: "متن هوشمند", type: "boolean" },
+      { key: "smartReply", label: "پاسخ هوشمند", type: "boolean" },
+      { key: "autoResponder", label: "پاسخگوی خودکار", type: "boolean" },
+      { key: "inbox", label: "صندوق پیام‌ها", type: "boolean" },
+      { key: "aiPerMonth", label: "هوش مصنوعی در ماه", type: "number" },
+    ],
+  },
+  {
+    id: "destinations",
+    title: "مقاصد و دکمه‌ها",
+    items: [
+      { key: "destinations", label: "تعداد مقاصد", type: "number" },
+      { key: "glassButtons", label: "دکمه‌های شیشه‌ای", type: "boolean" },
+      { key: "glassButtonsPerDest", label: "دکمه شیشه‌ای هر مقصد", type: "number" },
+      { key: "channels", label: "تعداد کانال‌ها", type: "number" },
+    ],
+  },
+  {
+    id: "integration",
+    title: "یکپارچه‌سازی",
+    items: [
+      { key: "woo", label: "ووکامرس", type: "boolean" },
+      { key: "goldBot", label: "ربات طلا", type: "boolean" },
+      { key: "goldMonitor", label: "پایش طلا", type: "boolean" },
+      { key: "advertising", label: "تبلیغات", type: "boolean" },
+      { key: "referral", label: "معرفی دوستان", type: "boolean" },
+    ],
+  },
+  {
+    id: "tools",
+    title: "ابزارها",
+    items: [
+      { key: "wallet", label: "کیف پول", type: "boolean" },
+      { key: "tickets", label: "تیکت پشتیبانی", type: "boolean" },
+      { key: "stats", label: "آمار تفکیکی", type: "boolean" },
+      { key: "apiAccess", label: "دسترسی API", type: "boolean" },
+    ],
+  },
+];
+
+/** Flat list of all known feature defs (helper for counting / iterating). */
+export const ALL_FEATURE_DEFS: PlanFeatureDef[] = FEATURE_CATALOG.flatMap((g) => g.items);
+
+/** Type-guard: is this feature key a boolean toggle? */
+export function isBooleanFeature(key: PlanFeatureKey): boolean {
+  return ALL_FEATURE_DEFS.find((d) => d.key === key)?.type === "boolean";
+}
+
+/** Read a boolean feature with fallback. */
+export function getFeatureBoolean(
+  features: PlanFeatures | null | undefined,
+  key: PlanBooleanFeatureKey,
+  fallback = false,
+): boolean {
+  if (!features) return fallback;
+  const v = features[key];
+  return typeof v === "boolean" ? v : fallback;
+}
+
+/** Read a numeric feature with fallback. 0 = unlimited. */
+export function getFeatureNumber(
+  features: PlanFeatures | null | undefined,
+  key: PlanNumericFeatureKey,
+  fallback = 0,
+): number {
+  if (!features) return fallback;
+  const v = features[key];
+  return typeof v === "number" && Number.isFinite(v) ? v : fallback;
+}
+
+/** Count enabled features (booleans = true + numerics > 0) for badge display. */
+export function countEnabledFeatures(features: PlanFeatures | null | undefined): number {
+  if (!features) return 0;
+  let n = 0;
+  for (const def of ALL_FEATURE_DEFS) {
+    const v = features[def.key];
+    if (def.type === "boolean") {
+      if (v === true) n += 1;
+    } else {
+      if (typeof v === "number" && v > 0) n += 1;
+    }
+  }
+  return n;
+}
+
+/** Parse + validate a raw features JSON string into a PlanFeatures object. */
+export function parsePlanFeatures(raw: string | null | undefined): PlanFeatures {
+  const obj = safeJsonParse<Record<string, unknown>>(raw ?? "{}", {});
+  const out: PlanFeatures = {};
+  for (const def of ALL_FEATURE_DEFS) {
+    if (!(def.key in obj)) continue;
+    const v = obj[def.key];
+    if (def.type === "boolean") {
+      if (typeof v === "boolean") out[def.key] = v;
+      else if (typeof v === "number") out[def.key] = v !== 0;
+    } else {
+      if (typeof v === "number" && Number.isFinite(v)) out[def.key] = Math.max(0, Math.floor(v));
+      else if (typeof v === "string" && v.trim() !== "" && Number.isFinite(Number(v)))
+        out[def.key] = Math.max(0, Math.floor(Number(v)));
+    }
+  }
+  return out;
+}
+
 export interface PublicPlanView {
   id: string;
   code: string;
@@ -39,6 +263,12 @@ export interface PublicPlanView {
   priceRialsFa: string;
   intervalMonths: number;
   quota: PlanQuota;
+  features: PlanFeatures;
+  imageUrl: string | null;
+  discountPct: number;
+  renewalDiscountPct: number;
+  renewalDiscountWindowDays: number;
+  sortOrder: number;
   active: boolean;
   isPublic: boolean;
 }
@@ -136,7 +366,7 @@ export async function listPublicPlans(): Promise<PublicPlanView[]> {
   await ensurePlansSeeded();
   const rows = await db.plan.findMany({
     where: { isPublic: true, active: true },
-    orderBy: { priceRials: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { priceRials: "asc" }],
   });
   return rows.map((p) => ({
     id: p.id,
@@ -147,6 +377,12 @@ export async function listPublicPlans(): Promise<PublicPlanView[]> {
     priceRialsFa: formatRials(p.priceRials),
     intervalMonths: p.intervalMonths,
     quota: safeJsonParse<PlanQuota>(p.quota, {}),
+    features: parsePlanFeatures(p.features),
+    imageUrl: p.imageUrl,
+    discountPct: p.discountPct ?? 0,
+    renewalDiscountPct: p.renewalDiscountPct ?? 0,
+    renewalDiscountWindowDays: p.renewalDiscountWindowDays ?? 0,
+    sortOrder: p.sortOrder ?? 0,
     active: p.active,
     isPublic: p.isPublic,
   }));

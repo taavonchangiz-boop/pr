@@ -5,8 +5,9 @@
 // Card showing:
 //   - the user's referral code (large, copyable)
 //   - share URL — /ref/<code> rendered as an absolute link
-//   - stats: تعداد زیرمجموعه‌ها | مجموع پاداش‌ها (formatted Rials)
-//   - list of referred users (mobile masked, joinedAt Jalali, reward amount)
+//   - stats: تعداد زیرمجموعه‌ها (referredCount) | مجموع پاداش‌ها
+//   - prominent «تعداد زیرمجموعه‌ها: N نفر» header
+//   - list of recent referrals (name + date + status + reward)
 // =====================================================================
 import { useEffect, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
@@ -32,11 +33,50 @@ export interface ReferralViewProps {
   navigate: (to: string) => void;
 }
 
+// ---------------------------------------------------------------------
+// Local extended stats type. The server (src/lib/payments/referral.ts)
+// returns these fields; the legacy `ReferralStatsRow` in api.ts is left
+// untouched (additive only), so we re-declare the wider shape here.
+// ---------------------------------------------------------------------
+interface ReferredRow {
+  maskedEmail: string;
+  maskedMobile: string;
+  fullName: string;
+  status: string;
+  rewardStatus: string | null;
+  amountRials: number;
+  amountFa: string;
+  createdAt: string;
+  rewardCreatedAt: string | null;
+}
+interface ReferralStatsExtended {
+  referralCode: string;
+  referredCount: number;
+  totalReferrals: number;
+  totalRewardRials: number;
+  totalRewardFa: string;
+  policyFa?: string;
+  referred: ReferredRow[];
+}
+
+function statusFa(status: string): string {
+  switch (status) {
+    case "active": return "فعال";
+    case "suspended": return "معلق";
+    default: return status;
+  }
+}
+function statusBadgeTone(status: string): "default" | "secondary" | "destructive" {
+  if (status === "active") return "default";
+  if (status === "suspended") return "destructive";
+  return "secondary";
+}
+
 function StatsRow({
-  totalReferrals,
+  referredCount,
   totalRewardRials,
 }: {
-  totalReferrals: number;
+  referredCount: number;
   totalRewardRials: number;
 }) {
   return (
@@ -48,7 +88,9 @@ function StatsRow({
           </div>
           <div className="flex flex-col">
             <span className="text-xs text-muted-foreground">تعداد زیرمجموعه‌ها</span>
-            <span className="text-2xl font-bold tabular-nums">{toPersianDigits(totalReferrals)}</span>
+            <span className="text-2xl font-bold tabular-nums">
+              {toPersianDigits(referredCount)} نفر
+            </span>
           </div>
         </CardContent>
       </Card>
@@ -115,7 +157,13 @@ function CodeBox({ code }: { code: string }) {
             dir="ltr"
             className="text-center font-mono text-lg font-bold tracking-wider"
           />
-          <Button onClick={copyCode} variant="secondary" size="icon" className="shrink-0" aria-label="کپی کد">
+          <Button
+            onClick={copyCode}
+            variant="secondary"
+            size="icon"
+            className="shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            aria-label="کپی کد"
+          >
             {copiedCode ? <CheckIcon className="size-4 text-emerald-600" /> : <CopyIcon className="size-4" />}
           </Button>
         </div>
@@ -126,7 +174,13 @@ function CodeBox({ code }: { code: string }) {
             dir="ltr"
             className="text-xs"
           />
-          <Button onClick={copyShare} variant="outline" size="icon" className="shrink-0" aria-label="کپی نشانی">
+          <Button
+            onClick={copyShare}
+            variant="outline"
+            size="icon"
+            className="shrink-0 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            aria-label="کپی نشانی"
+          >
             {copiedShare ? <CheckIcon className="size-4 text-emerald-600" /> : <CopyIcon className="size-4" />}
           </Button>
         </div>
@@ -138,17 +192,7 @@ function CodeBox({ code }: { code: string }) {
   );
 }
 
-function ReferredList({
-  referred,
-}: {
-  referred: Array<{
-    maskedEmail: string;
-    maskedMobile: string;
-    amountRials: number;
-    amountFa: string;
-    createdAt: string;
-  }>;
-}) {
+function ReferredList({ referred }: { referred: ReferredRow[] }) {
   if (referred.length === 0) {
     return (
       <Card dir="rtl">
@@ -166,7 +210,7 @@ function ReferredList({
             <SparklesIcon className="size-8 text-muted-foreground" />
             <div className="text-sm font-medium">لیست خالی است</div>
             <div className="text-xs text-muted-foreground">
-              پس از اولین زیرمجموعهٔ فعال، اینجا نمایش داده می‌شود.
+              پس از اولین زیرمجموعه، اینجا نمایش داده می‌شود.
             </div>
           </div>
         </CardContent>
@@ -179,27 +223,44 @@ function ReferredList({
         <CardTitle className="flex items-center gap-2 text-base">
           <UsersIcon className="size-4" />
           زیرمجموعه‌ها
+          <Badge variant="secondary" className="font-normal">
+            {toPersianDigits(referred.length)} نفر
+          </Badge>
         </CardTitle>
         <CardDescription className="text-xs">
-          فهرست زیرمجموعه‌هایی که اشتراک فعال دارند.
+          فهرست آخرین زیرمجموعه‌های شما به‌ترتیب زمان ثبت‌نام.
         </CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <ul className="max-h-96 divide-y overflow-y-auto" dir="rtl">
-          {referred.map((r, i) => (
-            <li key={`${r.maskedMobile}-${i}`} className="flex items-center justify-between gap-2 p-3 text-sm">
-              <div className="flex flex-col gap-0.5">
-                <span className="font-mono text-xs" dir="ltr">{r.maskedMobile || r.maskedEmail || "—"}</span>
-                <span className="text-xs text-muted-foreground">
-                  {formatJalaliDate(r.createdAt)}
-                </span>
-              </div>
-              <Badge className="gap-1 bg-emerald-600 text-white">
-                <GiftIcon className="size-3" />
-                {r.amountFa ?? formatRials(r.amountRials)}
-              </Badge>
-            </li>
-          ))}
+          {referred.map((r, i) => {
+            const name = r.fullName?.trim() || r.maskedMobile || r.maskedEmail || "—";
+            return (
+              <li key={`${r.maskedMobile}-${i}`} className="flex items-center justify-between gap-2 p-3 text-sm">
+                <div className="flex flex-col gap-0.5">
+                  <span className="font-medium">{name}</span>
+                  <span className="text-xs text-muted-foreground">
+                    {formatJalaliDate(r.createdAt)}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant={statusBadgeTone(r.status)} className="text-[10px]">
+                    {statusFa(r.status)}
+                  </Badge>
+                  {r.rewardStatus === "paid" && r.amountRials > 0 ? (
+                    <Badge className="gap-1 bg-emerald-600 text-white">
+                      <GiftIcon className="size-3" />
+                      {r.amountFa ?? formatRials(r.amountRials)}
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-[10px]">
+                      بدون پاداش
+                    </Badge>
+                  )}
+                </div>
+              </li>
+            );
+          })}
         </ul>
       </CardContent>
     </Card>
@@ -210,7 +271,23 @@ export default function ReferralView({ navigate: _navigate }: ReferralViewProps)
   void _navigate;
   const statsQ = useQuery({
     queryKey: ["referral", "stats"],
-    queryFn: () => api.getReferralStats(),
+    queryFn: async (): Promise<ReferralStatsExtended> => {
+      // Local fetch (instead of api.getReferralStats) so the new
+      // referredCount/fullName/status fields type-check without editing
+      // api.ts. The endpoint contract is the same.
+      const r = await fetch("/api/referral", { credentials: "same-origin" });
+      if (!r.ok) throw new Error("بارگذاری آمار معرفی ناموفق بود.");
+      const data = (await r.json()) as Partial<ReferralStatsExtended>;
+      return {
+        referralCode: data.referralCode ?? "",
+        referredCount: typeof data.referredCount === "number" ? data.referredCount : (data.totalReferrals ?? 0),
+        totalReferrals: data.totalReferrals ?? 0,
+        totalRewardRials: data.totalRewardRials ?? 0,
+        totalRewardFa: data.totalRewardFa ?? formatRials(data.totalRewardRials ?? 0),
+        policyFa: data.policyFa,
+        referred: Array.isArray(data.referred) ? data.referred : [],
+      };
+    },
     staleTime: 30_000,
   });
 
@@ -219,7 +296,7 @@ export default function ReferralView({ navigate: _navigate }: ReferralViewProps)
   }, [statsQ.error]);
 
   const code = statsQ.data?.referralCode ?? "";
-  const totalReferrals = statsQ.data?.totalReferrals ?? 0;
+  const referredCount = statsQ.data?.referredCount ?? 0;
   const totalRewardRials = statsQ.data?.totalRewardRials ?? 0;
   const referred = useMemo(() => statsQ.data?.referred ?? [], [statsQ.data]);
 
@@ -242,6 +319,29 @@ export default function ReferralView({ navigate: _navigate }: ReferralViewProps)
         </p>
       </header>
 
+      {/* Prominent referred count banner */}
+      <Card dir="rtl" className="border-primary/30 bg-primary/5">
+        <CardContent className="flex items-center gap-3 p-4">
+          <div className="rounded-md bg-primary/15 p-3">
+            <UsersIcon className="size-6 text-primary" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-xs text-muted-foreground">تعداد زیرمجموعه‌ها</span>
+            <span className="text-3xl font-bold tabular-nums">
+              {toPersianDigits(referredCount)} نفر
+            </span>
+          </div>
+          <div className="mr-auto flex flex-col items-end gap-1 text-xs text-muted-foreground">
+            <span>
+              پاداش فعال: {toPersianDigits(statsQ.data?.totalReferrals ?? 0)} نفر
+            </span>
+            <span>
+              مجموع پاداش: {formatRials(totalRewardRials)}
+            </span>
+          </div>
+        </CardContent>
+      </Card>
+
       {statsQ.data?.policyFa && (
         <div className="rounded-md border bg-muted/30 p-3 text-xs text-muted-foreground" dir="rtl">
           <span className="font-medium text-foreground">خط‌میش پاداش: </span>
@@ -249,7 +349,7 @@ export default function ReferralView({ navigate: _navigate }: ReferralViewProps)
         </div>
       )}
 
-      <StatsRow totalReferrals={totalReferrals} totalRewardRials={totalRewardRials} />
+      <StatsRow referredCount={referredCount} totalRewardRials={totalRewardRials} />
 
       <CodeBox code={code} />
 

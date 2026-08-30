@@ -19,7 +19,9 @@ import { z } from "zod";
 import { toast } from "sonner";
 import {
   BellIcon,
+  CalendarClockIcon,
   CopyIcon,
+  CrownIcon,
   KeyRoundIcon,
   Loader2Icon,
   LockIcon,
@@ -37,9 +39,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import { api } from "@/components/postyar/api";
 import { useSession } from "@/components/layout/session-provider";
-import { toPersianDigits } from "@/lib/persian";
+import { toPersianDigits, formatJalaliDate } from "@/lib/persian";
 
 export interface ProfileViewProps {
   navigate: (to: string) => void;
@@ -498,8 +501,7 @@ function NotificationPrefsCard() {
   );
 }
 
-export default function ProfileView({ navigate: _navigate }: ProfileViewProps) {
-  void _navigate;
+export default function ProfileView({ navigate }: ProfileViewProps) {
   return (
     <div className="flex flex-col gap-4" dir="rtl">
       <header>
@@ -517,6 +519,8 @@ export default function ProfileView({ navigate: _navigate }: ProfileViewProps) {
         <Badge variant="outline" className="mr-auto">فقط ۷ فیلد پروفایل</Badge>
       </div>
 
+      <SubscriptionCard navigate={navigate} />
+
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <ProfileFieldsCard />
         <div className="flex flex-col gap-4">
@@ -525,5 +529,144 @@ export default function ProfileView({ navigate: _navigate }: ProfileViewProps) {
         </div>
       </div>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Subscription card — shows the user's active plan name, days remaining,
+// quota progress, and a CTA to the plans page. Falls back to an upgrade
+// CTA when the user has no active subscription. Reuses the existing
+// `api.getMySubscription()` endpoint (no new API surface added).
+// ---------------------------------------------------------------------
+function SubscriptionCard({ navigate }: { navigate: (to: string) => void }) {
+  const subQ = useQuery({
+    queryKey: ["subscription", "me"],
+    queryFn: () => api.getMySubscription(),
+    staleTime: 30_000,
+  });
+
+  if (subQ.isLoading) {
+    return (
+      <Card dir="rtl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-base">
+            <CrownIcon className="size-4" />
+            اشتراک فعال
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-3">
+          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-3 w-2/3" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const sub = subQ.data?.subscription ?? null;
+  const quota = subQ.data?.quota ?? null;
+
+  if (!sub) {
+    return (
+      <Card dir="rtl" className="border-amber-300 bg-amber-50/40">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-md bg-amber-100 p-2 text-amber-700">
+              <CrownIcon className="size-5" />
+            </div>
+            <div>
+              <div className="text-sm font-medium">پلن فعلی فعال نیست</div>
+              <div className="text-xs text-muted-foreground">
+                برای استفاده از همهٔ قابلیت‌های پُست‌یار یک پلن انتخاب کنید.
+              </div>
+            </div>
+          </div>
+          <Button
+            variant="default"
+            size="sm"
+            onClick={() => navigate("/dashboard/plans")}
+            className="gap-1.5 cursor-pointer"
+          >
+            <CrownIcon className="size-4" />
+            ارتقای پلن
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const endsAt = sub.endsAt ? new Date(sub.endsAt) : null;
+  const remainingDays = endsAt
+    ? Math.max(0, Math.ceil((endsAt.getTime() - Date.now()) / (24 * 60 * 60 * 1000)))
+    : 0;
+  const totalDays = sub.startedAt && endsAt
+    ? Math.max(1, Math.round((endsAt.getTime() - new Date(sub.startedAt).getTime()) / (24 * 60 * 60 * 1000)))
+    : 1;
+  const usedPct = Math.min(100, Math.max(0, ((totalDays - remainingDays) / totalDays) * 100));
+
+  const publishUsed = quota?.publishPerMonth?.used ?? 0;
+  const publishLimit = quota?.publishPerMonth?.limit ?? 0;
+  const publishPct = publishLimit ? Math.min(100, (publishUsed / publishLimit) * 100) : 0;
+  const aiUsed = quota?.aiPerMonth?.used ?? 0;
+  const aiLimit = quota?.aiPerMonth?.limit ?? 0;
+  const aiPct = aiLimit ? Math.min(100, (aiUsed / aiLimit) * 100) : 0;
+
+  return (
+    <Card dir="rtl">
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between gap-2 text-base">
+          <span className="flex items-center gap-2">
+            <CrownIcon className="size-4 text-primary" />
+            اشتراک فعال
+          </span>
+          <Badge variant="secondary" className="gap-1.5">
+            <CalendarClockIcon className="size-3" />
+            {toPersianDigits(remainingDays)} روز باقی‌مانده
+          </Badge>
+        </CardTitle>
+        <CardDescription className="text-xs">
+          پلن: <span className="font-medium text-foreground">{sub.planNameFa ?? "—"}</span>
+          {endsAt && <> • پایان: {formatJalaliDate(endsAt.toISOString())}</>}
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="flex flex-col gap-4">
+        <div className="flex flex-col gap-1.5">
+          <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+            <span>گذشت زمان اشتراک</span>
+            <span className="tabular-nums">{toPersianDigits(Math.round(usedPct))}٪</span>
+          </div>
+          <Progress value={usedPct} className="h-1.5" />
+        </div>
+        {publishLimit > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>انتشار در ماه</span>
+              <span className="tabular-nums">
+                {toPersianDigits(publishUsed)} از {toPersianDigits(publishLimit)}
+              </span>
+            </div>
+            <Progress value={publishPct} className="h-1.5" />
+          </div>
+        )}
+        {aiLimit > 0 && (
+          <div className="flex flex-col gap-1.5">
+            <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+              <span>هوش مصنوعی در ماه</span>
+              <span className="tabular-nums">
+                {toPersianDigits(aiUsed)} از {toPersianDigits(aiLimit)}
+              </span>
+            </div>
+            <Progress value={aiPct} className="h-1.5" />
+          </div>
+        )}
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => navigate("/dashboard/subscriptions")}
+          className="w-fit gap-1.5 cursor-pointer"
+        >
+          مدیریت اشتراک
+        </Button>
+      </CardContent>
+    </Card>
   );
 }

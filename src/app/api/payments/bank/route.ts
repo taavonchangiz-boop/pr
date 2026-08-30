@@ -1,4 +1,11 @@
 // POSTYAR — POST /api/payments/bank — create bank gateway request
+// ---------------------------------------------------------------------
+// ITEM 41 — the `mode` body field is OPTIONAL. The default ("direct") is
+// resolved by the backend; the user never picks "direct" vs "intermediary"
+// in the UI. The bank lib (`lib/payments/bank.ts`) still supports both
+// modes for backward compat with the persisted `BankGatewayRef.mode`
+// column + the verify callback; the API just no longer makes the user
+// choose. The resolved mode is recorded in the audit log.
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
@@ -7,7 +14,9 @@ import { getBankProvider, type BankMode } from "@/lib/payments/bank";
 
 const BodySchema = z.object({
   orderId: z.string().min(1),
-  mode: z.enum(["direct", "intermediary"]),
+  // Optional — defaults to "direct" server-side. The UI no longer asks
+  // the user to pick direct/intermediary.
+  mode: z.enum(["direct", "intermediary"]).optional(),
 });
 
 export async function POST(req: Request) {
@@ -39,6 +48,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ errorFa: "این سفارش قابل پرداخت نیست." }, { status: 400 });
   }
 
+  // Resolve the mode — the user no longer picks; we use "direct" by
+  // default (or whatever the client explicitly sent — kept for backward
+  // compat with any older client that still sends a mode).
+  const mode: BankMode = parsed.data.mode ?? "direct";
+
   const provider = getBankProvider();
   const result = await provider.bankCreatePaymentRequest({
     order: {
@@ -49,7 +63,7 @@ export async function POST(req: Request) {
       descriptionFa: order.descriptionFa,
       status: order.status,
     },
-    mode: parsed.data.mode as BankMode,
+    mode,
   });
   if (result.errorFa) {
     await audit({
@@ -59,7 +73,7 @@ export async function POST(req: Request) {
       targetType: "order",
       targetId: order.id,
       ip,
-      meta: { mode: parsed.data.mode, errorFa: result.errorFa },
+      meta: { mode, errorFa: result.errorFa },
     });
     return NextResponse.json({ errorFa: result.errorFa }, { status: 422 });
   }
@@ -70,7 +84,7 @@ export async function POST(req: Request) {
     targetType: "order",
     targetId: order.id,
     ip,
-    meta: { mode: parsed.data.mode, authority: result.authority },
+    meta: { mode, authority: result.authority },
   });
   return NextResponse.json({
     ok: true,

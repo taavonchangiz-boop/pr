@@ -42,6 +42,11 @@ import {
 import { cn } from "@/lib/utils";
 import { toPersianDigits } from "@/lib/persian";
 
+// NOTE (ITEM 35): این بخش فقط برای مدیر سامانه قابل مشاهده است.
+// The route /api/stats/admin enforces `requireRole(["admin"])`; the dashboard
+// only renders this view for admins. The displayed `generatedAtFa` is a
+// Tehran-TZ Jalali date+time (۱۵۰۵/۰۶/۰۷ - ۱۵:۳۰) — never Gregorian.
+
 // ---------- API types (mirrors /api/stats/admin response) ----------
 type UsersStat = {
   total: number;
@@ -94,6 +99,7 @@ type AdminStatsResponse = {
   growth: { thisWeek: number; lastWeek: number; pct: number };
   topPublishers: TopPublisher[];
   generatedAtFa: string;
+  generatedAt?: string;
 };
 
 // ---------- Loading skeleton ----------

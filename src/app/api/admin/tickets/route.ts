@@ -15,11 +15,13 @@ export async function GET(req: Request) {
   const offset = Number(url.searchParams.get("offset") ?? "0");
   const status = url.searchParams.get("status") ?? undefined;
   const assignedToId = url.searchParams.get("assignedToId") ?? undefined;
+  const departmentId = url.searchParams.get("departmentId") ?? undefined;
   const r = await listAllTicketsForAdmin({
     limit: Number.isFinite(limit) ? limit : 50,
     offset: Number.isFinite(offset) ? offset : 0,
     status: status ?? undefined,
     assignedToId: assignedToId === "null" ? null : assignedToId ?? undefined,
+    departmentId: departmentId === "null" ? null : departmentId ?? undefined,
   });
   return NextResponse.json(r);
 }

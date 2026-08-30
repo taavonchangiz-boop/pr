@@ -27,7 +27,7 @@ import {
   CalendarClockIcon, ShieldCheckIcon, ZapIcon, GlobeIcon,
   LanguagesIcon, SmartphoneIcon, CheckCircle2Icon, ArrowLeftIcon,
   LayoutGridIcon, MessageCircleIcon, LockIcon, KeyRoundIcon, PlayCircleIcon,
-  StarIcon, ArrowRightIcon,
+  StarIcon, ArrowRightIcon, RadioIcon, UsersIcon, HeartIcon, ClockIcon,
 } from "lucide-react";
 import {
   toPersianDigits, isValidEmail, isValidIranMobile, normalizeMobile,
@@ -41,10 +41,10 @@ export interface LandingProps {
 }
 
 const FEATURES: { icon: any; title: string; body: string; tint: string }[] = [
-  { icon: SendIcon, title: "انتشار چندکاناله", body: "همگام‌سازی یک کلیک روی تلگرام، باله و روبیکا.", tint: "#22d3ee" },
+  { icon: SendIcon, title: "انتشار چندکاناله", body: "همگام‌سازی یک کلیک روی تلگرام، بله و روبیکا.", tint: "#22d3ee" },
   { icon: CalendarClockIcon, title: "زمان‌بندی جلالی", body: "تقویم حرفه‌ای فارسی برای انتشار دقیق در هر ساعت.", tint: "#34d399" },
   { icon: SparklesIcon, title: "هوش مصنوعی", body: "تولید کپشن، متن هوشمند و پاسخ خودکار با پشتیبانی چند ارائه‌دهنده.", tint: "#A855F7" },
-  { icon: BotIcon, title: "بات‌ساز بدون کدنویسی", body: "ساخت بات تلگرام، باله و روبیکا با گردش کار واقعی.", tint: "#38bdf8" },
+  { icon: BotIcon, title: "بات‌ساز بدون کدنویسی", body: "ساخت بات تلگرام، بله و روبیکا با گردش کار واقعی.", tint: "#38bdf8" },
   { icon: WalletIcon, title: "کیف پول و دفتر کل", body: "مدیریت مالیه با ثبت دقیق هر تراکنش و جلوگیری از دو-بار‌گذاری.", tint: "#f59e0b" },
   { icon: GiftIcon, title: "معرفی دوستان", body: "سامانه ارجاع با کد اختصاصی و پاداش خودکار.", tint: "#34d399" },
   { icon: TrendingUpIcon, title: "پایش طلا", body: "قیمت لحظه‌ای طلای ۱۸، سکه امامی و انس جهانی + بات هشدار.", tint: "#22d3ee" },
@@ -63,17 +63,30 @@ const TRUST: { icon: any; title: string; body: string }[] = [
 ];
 
 const FAQ: { q: string; a: string }[] = [
-  { q: "آیا پُست‌یار فقط برای تلگرام است؟", a: "خیر؛ سه پلتفرم تلگرام، باله و روبیکا به‌صورت هم‌زمان پشتیبانی می‌شوند و هر کدام دکمه‌های شیشه‌ای مختص خود را دارند." },
-  { q: "آیا پرداخت با باله واقعی است؟", a: "بله؛ پُست‌یار از پروتکل واقعی بات باله (sendInvoice → pre_checkout_query → successful_payment) با تأیید سمت-سرور مبلغ و امضای HMAC استفاده می‌کند." },
+  { q: "آیا پُست‌یار فقط برای تلگرام است؟", a: "خیر؛ سه پلتفرم تلگرام، بله و روبیکا به‌صورت هم‌زمان پشتیبانی می‌شوند و هر کدام دکمه‌های شیشه‌ای مختص خود را دارند." },
+  { q: "آیا پرداخت با بله واقعی است؟", a: "بله؛ پُست‌یار از پروتکل واقعی بات بله (sendInvoice → pre_checkout_query → successful_payment) با تأیید سمت-سرور مبلغ و امضای HMAC استفاده می‌کند." },
   { q: "آیا داده‌های مالی من امن هستند؟", a: "هر تراکنش مالیه با کلید یکتا idempotency ثبت می‌شود تا تحت هیچ شرایطی دو بار اعتبار نگیرد. مبالغ به‌صورت اعداد صحیح ریال نگهداری می‌شوند." },
   { q: "آیا برای استفاده نیاز به دانش فنی است؟", a: "خیر؛ رابط کاربری کاملاً فارسی و راست‌چین است. بات‌ساز بدون کدنویسی، تنظیم‌گراف گردش کار و تقویم جلالی مخصوص فارسی‌زبان‌ها طراحی شده است." },
   { q: "آیا روی هاست cPanel قابل نصب است؟", a: "بله؛ پُست‌یار برای محیط cPanel/Passenger + Node.js + MariaDB + Redis طراحی و بهینه شده است." },
 ];
 
 const VALUE_PROPS: { icon: any; title: string; body: string }[] = [
-  { icon: LayoutGridIcon, title: "یک منبع، چندین خروجی", body: "محتوای خود را یک بار بنویسید و با یک کلیک روی همهٔ کانال‌های تلگرام، باله و روبیکا منتشر کنید." },
+  { icon: LayoutGridIcon, title: "یک منبع، چندین خروجی", body: "محتوای خود را یک بار بنویسید و با یک کلیک روی همهٔ کانال‌های تلگرام، بله و روبیکا منتشر کنید." },
   { icon: CalendarClockIcon, title: "زمان‌بندی دقیق جلالی", body: "تقویم فارسی حرفه‌ای با انتخاب ساعت و دقیقه؛ زمان اجرا دقیقاً با زمان انتخاب‌شده مطابقت دارد." },
   { icon: SparklesIcon, title: "هوش مصنوعی در دل کار", body: "کپشن هوشمند، متن هوشمند و پاسخ هوشمند در همان ویرایشگر محتوا در دسترس شماست." },
+];
+
+// Hero visual — supported platforms as glassmorphic mini-cards (lucide generic
+// icons tinted with each platform's official brand color; lucide has no brand
+// icons so this is the closest equivalent).
+const PLATFORMS: { icon: any; label: string; color: string }[] = [
+  { icon: SendIcon,          label: "تلگرام",       color: "#22d3ee" },
+  { icon: MessageCircleIcon, label: "بله",          color: "#3b82f6" },
+  { icon: RadioIcon,         label: "روبیکا",       color: "#8b5cf6" },
+  { icon: BotIcon,           label: "بات",          color: "#34d399" },
+  { icon: SparklesIcon,      label: "هوش مصنوعی",  color: "#34d399" },
+  { icon: GlobeIcon,         label: "وردپرس",       color: "#21759b" },
+  { icon: ShoppingCartIcon,  label: "ووکامرس",      color: "#7f54b3" },
 ];
 
 const FONT_STACK = { fontFamily: "Vazirmatn, ui-sans-serif, system-ui, sans-serif" } as const;
@@ -138,11 +151,8 @@ export function Landing({ navigate }: LandingProps) {
               onClick={(e) => { e.preventDefault(); navigate("/rules"); }}
               className="text-[#dbe7ff]/80 hover:text-[#22d3ee] motion-safe:transition-colors cursor-pointer"
             >قوانین و مقررات</a>
-            <a
-              href="#/training"
-              onClick={(e) => { e.preventDefault(); navigate("/training"); }}
-              className="text-[#dbe7ff]/80 hover:text-[#22d3ee] motion-safe:transition-colors cursor-pointer"
-            >آموزش</a>
+            {/* NOTE: آموزش is no longer public — it is reachable from inside the
+                authenticated dashboard via /dashboard/training (see dashboard.tsx). */}
           </nav>
 
           {/* left: login + register (or dashboard button if authed) */}
@@ -203,8 +213,8 @@ export function Landing({ navigate }: LandingProps) {
               مدیریت هوشمند محتوا و انتشار چندکاناله
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-7 text-[#94a3b8] md:text-base lg:mx-0">
-              از صفر تا صد؛ انتشار هم‌زمان روی تلگرام، باله و روبیکا، زمان‌بندی با تقویم جلالی،
-              بات‌ساز بدون کدنویسی، پرداخت با کارت و درگاه و باله، کیف پول و دفتر کل شفاف،
+              از صفر تا صد؛ انتشار هم‌زمان روی تلگرام، بله و روبیکا، زمان‌بندی با تقویم جلالی،
+              بات‌ساز بدون کدنویسی، پرداخت با کارت و درگاه و بله، کیف پول و دفتر کل شفاف،
               ارجاع و پاداش خودکار، پایش قیمت طلا و اتصال به ووکامرس.
             </p>
             <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:justify-center lg:justify-start">
@@ -227,7 +237,7 @@ export function Landing({ navigate }: LandingProps) {
               </Button>
             </div>
             <ul className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-[#94a3b8] lg:justify-start">
-              {["بدون نیاز به دانش فنی", "تلگرام، باله و روبیکا", "تقویم جلالی و ارقام فارسی", "نصب‌پذیر روی cPanel"].map((t) => (
+              {["بدون نیاز به دانش فنی", "تلگرام، بله و روبیکا", "تقویم جلالی و ارقام فارسی", "نصب‌پذیر روی cPanel"].map((t) => (
                 <li key={t} className="inline-flex items-center gap-1">
                   <CheckCircle2Icon className="size-3.5 text-[#34d399]" />
                   {t}
@@ -236,18 +246,120 @@ export function Landing({ navigate }: LandingProps) {
             </ul>
           </div>
 
-          {/* left column: hero image (second child → left in RTL) */}
+          {/* left column: composed hero visual (second child → left in RTL) */}
           <div className="relative">
+            {/* outer glow */}
             <div
-              className="pointer-events-none absolute -inset-4 -z-10 rounded-3xl motion-safe:animate-pulse"
-              style={{ background: "radial-gradient(circle at 50% 50%, rgba(34,211,238,0.25), transparent 70%)" }}
+              className="pointer-events-none absolute -inset-6 -z-10 rounded-3xl motion-safe:animate-pulse"
+              style={{ background: "radial-gradient(circle at 50% 50%, rgba(34,211,238,0.28), transparent 70%)" }}
               aria-hidden="true"
             />
-            <img
-              src="/landing/hero.png"
-              alt="نمای پلتفرم پُست‌یار"
-              className="w-full rounded-2xl border border-white/10 shadow-2xl shadow-[#070b16]"
-            />
+
+            {/* ===== central dashboard mock (uses /brand/postyar.webp) ===== */}
+            <div className="relative rounded-2xl border border-white/15 bg-[#0d1322]/80 p-2.5 shadow-2xl shadow-[#070b16] backdrop-blur">
+              {/* fake browser chrome */}
+              <div className="mb-2.5 flex items-center gap-1.5 border-b border-white/10 px-1 pb-2">
+                <span className="size-2.5 rounded-full bg-rose-500/70" />
+                <span className="size-2.5 rounded-full bg-amber-400/70" />
+                <span className="size-2.5 rounded-full bg-emerald-400/70" />
+                <div
+                  className="mx-auto rounded-md bg-white/5 px-3 py-0.5 text-[10px] leading-4 text-[#94a3b8]"
+                  dir="ltr"
+                >
+                  postyar.ir/dashboard
+                </div>
+              </div>
+              <img
+                src="/brand/postyar.webp"
+                alt="نمای داشبورد پُست‌یار"
+                className="w-full rounded-md border border-white/10"
+              />
+
+              {/* floating stat — کاربران فعال (top-right) */}
+              <div
+                className="absolute -top-5 -right-3 hidden sm:flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5 shadow-lg shadow-[#070b16] backdrop-blur motion-safe:animate-pulse"
+                aria-hidden="true"
+              >
+                <span
+                  className="rounded-lg p-1.5 text-[#34d399]"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(52,211,153,0.22), rgba(34,211,238,0.10))",
+                    border: "1px solid rgba(52,211,153,0.30)",
+                  }}
+                >
+                  <UsersIcon className="size-4" />
+                </span>
+                <div className="leading-tight">
+                  <div className="text-xs font-bold text-white">
+                    {toPersianDigits("۲۴+")} هزار
+                  </div>
+                  <div className="text-[10px] text-[#94a3b8]">کاربر فعال</div>
+                </div>
+              </div>
+
+              {/* floating stat — رضایت کاربران (bottom-left) */}
+              <div
+                className="absolute -bottom-5 -left-3 hidden sm:flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5 shadow-lg shadow-[#070b16] backdrop-blur motion-safe:animate-pulse"
+                style={{ animationDelay: "0.6s" }}
+                aria-hidden="true"
+              >
+                <span
+                  className="rounded-lg p-1.5 text-[#f59e0b]"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(245,158,11,0.22), rgba(168,85,247,0.10))",
+                    border: "1px solid rgba(245,158,11,0.30)",
+                  }}
+                >
+                  <HeartIcon className="size-4" />
+                </span>
+                <div className="leading-tight">
+                  <div className="text-xs font-bold text-white">
+                    {toPersianDigits("۹۴")}٪
+                  </div>
+                  <div className="text-[10px] text-[#94a3b8]">رضایت کاربران</div>
+                </div>
+              </div>
+
+              {/* floating stat — پشتیبانی ۲۴/۷ (mid-right, lg only) */}
+              <div
+                className="absolute top-1/2 -right-5 hidden -translate-y-1/2 lg:flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 p-2.5 shadow-lg shadow-[#070b16] backdrop-blur motion-safe:animate-pulse"
+                style={{ animationDelay: "1.2s" }}
+                aria-hidden="true"
+              >
+                <span
+                  className="rounded-lg p-1.5 text-[#22d3ee]"
+                  style={{
+                    background: "linear-gradient(135deg, rgba(34,211,238,0.22), rgba(56,189,248,0.10))",
+                    border: "1px solid rgba(34,211,238,0.30)",
+                  }}
+                >
+                  <ClockIcon className="size-4" />
+                </span>
+                <div className="leading-tight">
+                  <div className="text-xs font-bold text-white">
+                    {toPersianDigits("۲۴/۷")}
+                  </div>
+                  <div className="text-[10px] text-[#94a3b8]">پشتیبانی زنده</div>
+                </div>
+              </div>
+            </div>
+
+            {/* ===== platform glass badges strip (below the dashboard mock) ===== */}
+            <div className="mt-5 grid grid-cols-3 gap-2 sm:grid-cols-7">
+              {PLATFORMS.map((p) => {
+                const Icon = p.icon;
+                return (
+                  <div
+                    key={p.label}
+                    className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-2.5 backdrop-blur motion-safe:transition-colors hover:border-[#22d3ee]/40"
+                    title={p.label}
+                  >
+                    <Icon className="size-4" style={{ color: p.color }} />
+                    <span className="text-[10px] text-[#94a3b8]">{p.label}</span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         </div>
       </section>
@@ -320,6 +432,56 @@ export function Landing({ navigate }: LandingProps) {
         </div>
       </section>
 
+      {/* ============== ABOUT / BRAND STRIP (asovin.webp accent) ============== */}
+      <section className="border-b border-white/10 bg-[#05070f] py-14">
+        <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-4 md:grid-cols-2">
+          {/* brand image side accent */}
+          <div className="relative">
+            <div
+              className="pointer-events-none absolute -inset-3 -z-10 rounded-3xl motion-safe:animate-pulse"
+              style={{ background: "radial-gradient(circle at 50% 50%, rgba(245,158,11,0.18), transparent 70%)" }}
+              aria-hidden="true"
+            />
+            <img
+              src="/brand/asovin.webp"
+              alt="نمای برند پُست‌یار"
+              className="w-full rounded-2xl border border-white/10 shadow-2xl shadow-[#070b16]"
+            />
+          </div>
+          {/* text */}
+          <div>
+            <Badge className="border border-[#f59e0b]/30 bg-[#1a140a] text-[#f59e0b] hover:bg-[#1a140a]">
+              <ShieldCheckIcon className="size-3" />
+              دربارهٔ پُست‌یار
+            </Badge>
+            <h2 className="mt-4 text-2xl font-bold text-white md:text-3xl">یک پلتفرم، صد قابلیت</h2>
+            <p className="mt-3 text-sm leading-7 text-[#94a3b8]">
+              پُست‌یار یک سکوی همه‌کارهٔ فارسی‌محور برای کسب‌وکارهای ایرانی است که می‌خواهند
+              بدون کدنویسی، روی چند پلتفرم هم‌زمان حضور داشته باشند؛ از انتشار محتوا و
+              بات‌سازی تا پرداخت چندگانه و دفتر کل شفاف، همه یک‌جا.
+            </p>
+            <ul className="mt-5 grid grid-cols-1 gap-2 text-sm text-[#dbe7ff]/85 sm:grid-cols-2">
+              <li className="flex items-start gap-2">
+                <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" />
+                چرخهٔ کامل انتشار محتوا
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" />
+                بات‌ساز با گردش کار واقعی
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" />
+                پرداخت چندگانه و کیف پول شفاف
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" />
+                راست‌چین، جلالی و ارقام فارسی
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
       {/* ============== BOT BUILDER HIGHLIGHT ============== */}
       <section id="preview" className="border-b border-white/10 bg-[#05070f] py-14">
         <div className="mx-auto grid max-w-6xl grid-cols-1 items-center gap-10 px-4 md:grid-cols-2">
@@ -331,13 +493,13 @@ export function Landing({ navigate }: LandingProps) {
             </Badge>
             <h2 className="mt-4 text-2xl font-bold text-white md:text-3xl">بات خود را بسازید و گردش کار واقعی تعریف کنید</h2>
             <p className="mt-3 text-sm leading-7 text-[#94a3b8]">
-              بات تلگرام، باله یا روبیکا را با چند کلیک بسازید؛ توکن شما رمزنگاری می‌شود،
+              بات تلگرام، بله یا روبیکا را با چند کلیک بسازید؛ توکن شما رمزنگاری می‌شود،
               وب‌هوک با امضای HMAC تأیید می‌شود و گردش کار قابلیت‌های واقعی پرداخت،
               کیف پول، طلا و پشتیبانی را به‌هم متصل می‌کند.
             </p>
             <ul className="mt-5 space-y-2 text-sm text-[#dbe7ff]/85">
               <li className="flex items-start gap-2"><CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" /> اتصال کاربران به حساب پُست‌یار با کد یکبار مصرف امضا‌دار</li>
-              <li className="flex items-start gap-2"><CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" /> ارسال فاکتور باله با تأیید سمت-سرور مبلغ</li>
+              <li className="flex items-start gap-2"><CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" /> ارسال فاکتور بله با تأیید سمت-سرور مبلغ</li>
               <li className="flex items-start gap-2"><CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" /> تاریخچهٔ کامل پیام‌ها برای تحلیل و پشتیبانی</li>
               <li className="flex items-start gap-2"><CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" /> پرسش و پاسخ هوشمند با حفاظ از حلقه و سهمیه</li>
             </ul>
@@ -554,7 +716,6 @@ export function Landing({ navigate }: LandingProps) {
           </div>
           <nav className="flex flex-wrap items-center justify-center gap-4 text-xs text-[#94a3b8]" aria-label="پیوندهای پایین">
             <button type="button" onClick={() => navigate("/rules")} className="cursor-pointer hover:text-[#22d3ee] motion-safe:transition-colors">قوانین و مقررات</button>
-            <button type="button" onClick={() => navigate("/training")} className="cursor-pointer hover:text-[#22d3ee] motion-safe:transition-colors">آموزش</button>
             <a href="#features" onClick={scrollToId("features")} className="cursor-pointer hover:text-[#22d3ee] motion-safe:transition-colors">امکانات</a>
             <a href="#pricing" onClick={scrollToId("pricing")} className="cursor-pointer hover:text-[#22d3ee] motion-safe:transition-colors">پلن‌ها</a>
           </nav>
@@ -734,7 +895,7 @@ function LoginDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#0d1322] text-[#e2e8ff] p-0" style={FONT_STACK}>
-        <DialogHeader className="px-6 pt-6 text-right">
+        <DialogHeader className="px-6 pt-6 text-center">
           <DialogTitle className="text-lg font-bold text-white">ورود به پُست‌یار</DialogTitle>
           <DialogDescription className="text-[#94a3b8]">
             با ایمیل و رمز عبور یا شماره موبایل وارد شوید.
@@ -873,7 +1034,7 @@ function LoginDialog({
 
               {otpStep === "complete" && (
                 <form onSubmit={completeRegister} className="space-y-3 pt-3">
-                  <p className="text-xs text-[#94a3b8]">برای تکمیل ثبت‌نام، اطلاعات زیر را وارد کنید.</p>
+                  <p className="text-center text-xs text-[#94a3b8]">برای تکمیل ثبت‌نام، اطلاعات زیر را وارد کنید.</p>
                   <FieldDark label="نام" htmlFor="cmp-firstName">
                     <Input id="cmp-firstName" name="firstName" required dir="rtl" className="border-white/10 bg-[#05070f] text-white placeholder:text-[#94a3b8]" />
                   </FieldDark>
@@ -974,7 +1135,7 @@ function RegisterDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] max-w-md overflow-y-auto rounded-2xl border border-white/10 bg-[#0d1322] text-[#e2e8ff] p-0" style={FONT_STACK}>
-        <DialogHeader className="px-6 pt-6 text-right">
+        <DialogHeader className="px-6 pt-6 text-center">
           <DialogTitle className="text-lg font-bold text-white">ساخت حساب کاربری</DialogTitle>
           <DialogDescription className="text-[#94a3b8]">
             تمامی فیلدها به جز «نام کسب‌وکار» و «کد معرف» الزامی هستند.

@@ -70,7 +70,7 @@ const LENGTHS: Array<{ key: LengthKey; label: string }> = [
 
 const PLATFORMS: Array<{ key: PlatformKey; label: string }> = [
   { key: "telegram", label: "تلگرام" },
-  { key: "bale", label: "باله" },
+  { key: "bale", label: "بله" },
   { key: "rubika", label: "روبیکا" },
   { key: "instagram", label: "اینستاگرام" },
 ];

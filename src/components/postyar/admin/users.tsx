@@ -4,15 +4,21 @@
 // ---------------------------------------------------------------------
 // Paginated table: name, email, mobile masked, role, status, createdAt
 // (Jalali), actions: «تعلیق/رفع تعلیق» toggle, role change (user/support
-// /admin). Search box. All actions PATCH /api/admin/users/[id]. Audit
-// each action via toast.
+// /admin), and «تغییر رمز عبور» (reset password — POST /api/admin/users
+// /[id]/reset-password). Search box. All actions PATCH /api/admin/users
+// /[id]. Audit each action via toast.
 // =====================================================================
+// NOTE (ITEM 35): این بخش فقط برای مدیر سامانه قابل مشاهده است.
+// The route /api/admin/users and the reset-password sibling enforce
+// `requireRole(["admin"])`. The dashboard renders this view only for
+// admins.
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   ChevronLeftIcon,
   ChevronRightIcon,
+  KeyRoundIcon,
   Loader2Icon,
   SearchIcon,
   ShieldIcon,
@@ -22,6 +28,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -49,8 +56,17 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { api, type AdminUserRow } from "@/components/postyar/api";
 import { AdminGate } from "@/components/postyar/admin/gate";
+import { useSession } from "@/components/layout/session-provider";
 import { toPersianDigits } from "@/lib/persian";
 
 const PAGE_SIZE = 25;
@@ -73,10 +89,12 @@ export interface AdminUsersViewProps {
 
 function AdminUsersInner({ navigate: _navigate }: AdminUsersViewProps) {
   const qc = useQueryClient();
+  const { user: me } = useSession();
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
   const [confirm, setConfirm] = useState<{ id: string; action: "suspend" | "unsuspend" } | null>(null);
   const [roleChange, setRoleChange] = useState<{ id: string; role: "user" | "support" | "admin" } | null>(null);
+  const [pwReset, setPwReset] = useState<{ id: string; name: string } | null>(null);
 
   const q = useQuery({
     queryKey: ["admin", "users", search, page],
@@ -109,7 +127,7 @@ function AdminUsersInner({ navigate: _navigate }: AdminUsersViewProps) {
           کاربران
         </h1>
         <p className="text-sm text-muted-foreground">
-          مشاهده و مدیریت کاربران سیستم (تعلیق / رفع تعلیق / تغییر نقش).
+          مشاهده و مدیریت کاربران سیستم (تعلیق / رفع تعلیق / تغییر نقش / بازنشانی رمز عبور).
         </p>
       </div>
 
@@ -174,7 +192,7 @@ function AdminUsersInner({ navigate: _navigate }: AdminUsersViewProps) {
                           value={u.role}
                           onValueChange={(v) => setRoleChange({ id: u.id, role: v as "user" | "support" | "admin" })}
                         >
-                          <SelectTrigger className="w-28 h-8 text-xs"><SelectValue /></SelectTrigger>
+                          <SelectTrigger className="w-28 h-8 text-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-ring"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="user">کاربر</SelectItem>
                             <SelectItem value="support">پشتیبان</SelectItem>
@@ -186,12 +204,33 @@ function AdminUsersInner({ navigate: _navigate }: AdminUsersViewProps) {
                       <TableCell className="text-xs text-muted-foreground">{u.createdAtFa}</TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => setPwReset({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email })}
+                            disabled={!!me && me.id === u.id}
+                            title={me && me.id === u.id ? "برای تغییر رمز خود از پروفایل استفاده کنید" : "بازنشانی رمز عبور کاربر"}
+                            className="gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                          >
+                            <KeyRoundIcon className="size-3.5" />
+                            تغییر رمز
+                          </Button>
                           {u.status === "active" ? (
-                            <Button variant="outline" size="sm" onClick={() => setConfirm({ id: u.id, action: "suspend" })}>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => setConfirm({ id: u.id, action: "suspend" })}
+                              className="cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            >
                               <ShieldIcon className="size-3.5" /> تعلیق
                             </Button>
                           ) : (
-                            <Button variant="default" size="sm" onClick={() => setConfirm({ id: u.id, action: "unsuspend" })}>
+                            <Button
+                              variant="default"
+                              size="sm"
+                              onClick={() => setConfirm({ id: u.id, action: "unsuspend" })}
+                              className="cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                            >
                               رفع تعلیق
                             </Button>
                           )}
@@ -205,13 +244,13 @@ function AdminUsersInner({ navigate: _navigate }: AdminUsersViewProps) {
           )}
           {totalPages > 1 && (
             <div className="flex items-center justify-between border-t p-3">
-              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1}>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={page <= 1} className="cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
                 <ChevronRightIcon className="size-4" /> قبلی
               </Button>
               <span className="text-xs text-muted-foreground">
                 صفحهٔ {toPersianDigits(page)} از {toPersianDigits(totalPages)}
               </span>
-              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages}>
+              <Button variant="outline" size="sm" onClick={() => setPage((p) => Math.min(totalPages, p + 1))} disabled={page >= totalPages} className="cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">
                 بعدی <ChevronLeftIcon className="size-4" />
               </Button>
             </div>
@@ -230,9 +269,9 @@ function AdminUsersInner({ navigate: _navigate }: AdminUsersViewProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>انصراف</AlertDialogCancel>
+            <AlertDialogCancel className="cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">انصراف</AlertDialogCancel>
             <AlertDialogAction
-              className={confirm?.action === "suspend" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90" : ""}
+              className={confirm?.action === "suspend" ? "bg-destructive text-destructive-foreground hover:bg-destructive/90 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none" : "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"}
               onClick={() => confirm && patchMut.mutate({ id: confirm.id, body: { status: confirm.action === "suspend" ? "suspended" : "active" } })}
             >
               تأیید
@@ -250,8 +289,9 @@ function AdminUsersInner({ navigate: _navigate }: AdminUsersViewProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>انصراف</AlertDialogCancel>
+            <AlertDialogCancel className="cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none">انصراف</AlertDialogCancel>
             <AlertDialogAction
+              className="cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
               onClick={() => roleChange && patchMut.mutate({ id: roleChange.id, body: { role: roleChange.role } })}
             >
               تأیید
@@ -259,6 +299,17 @@ function AdminUsersInner({ navigate: _navigate }: AdminUsersViewProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {pwReset && (
+        <ResetPasswordDialog
+          target={pwReset}
+          onClose={() => setPwReset(null)}
+          onDone={() => {
+            setPwReset(null);
+            qc.invalidateQueries({ queryKey: ["admin", "users"] });
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -267,6 +318,114 @@ function roleLabelFa(r: string): string {
   if (r === "admin") return "مدیر";
   if (r === "support") return "پشتیبان";
   return "کاربر";
+}
+
+interface ResetPasswordDialogProps {
+  target: { id: string; name: string };
+  onClose: () => void;
+  onDone: () => void;
+}
+
+function ResetPasswordDialog({ target, onClose, onDone }: ResetPasswordDialogProps) {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPw, setConfirmPw] = useState("");
+  const [show, setShow] = useState(false);
+
+  const mut = useMutation({
+    mutationFn: () => {
+      if (newPassword.length < 8) throw new Error("رمز عبور باید حداقل ۸ کاراکتر باشد.");
+      if (newPassword !== confirmPw) throw new Error("رمز عبور و تکرار آن یکسان نیستند.");
+      return api.adminResetUserPassword(target.id, newPassword);
+    },
+    onSuccess: () => {
+      toast.success("رمز عبور کاربر با موفقیت بازنشانی شد.");
+      onDone();
+    },
+    onError: (e: Error) => toast.error(e.message ?? "بازنشانی رمز ناموفق بود."),
+  });
+
+  const canSubmit = newPassword.length >= 8 && newPassword === confirmPw && !mut.isPending;
+
+  return (
+    <Dialog open onOpenChange={(o) => { if (!o) onClose(); }}>
+      <DialogContent dir="rtl" className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <KeyRoundIcon className="size-5" />
+            تغییر رمز عبور
+          </DialogTitle>
+          <DialogDescription>
+            رمز عبور جدید را برای کاربر «<strong>{target.name}</strong>» وارد کنید. این عمل در ممیزی ثبت می‌شود و رمز هرگز نمایش داده نمی‌شود.
+          </DialogDescription>
+        </DialogHeader>
+        <form
+          className="flex flex-col gap-3"
+          onSubmit={(e) => { e.preventDefault(); if (canSubmit) mut.mutate(); }}
+        >
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="new-pw">رمز عبور جدید</Label>
+            <Input
+              id="new-pw"
+              type={show ? "text" : "password"}
+              value={newPassword}
+              onChange={(e) => setNewPassword(e.target.value)}
+              dir="ltr"
+              autoComplete="new-password"
+              minLength={8}
+              maxLength={128}
+              placeholder="حداقل ۸ کاراکتر"
+              className="cursor-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            />
+            <p className="text-[10px] text-muted-foreground">حداقل ۸ کاراکتر. توصیه می‌شود ترکیبی از حروف، عدد و نماد باشد.</p>
+          </div>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="confirm-pw">تکرار رمز عبور جدید</Label>
+            <Input
+              id="confirm-pw"
+              type={show ? "text" : "password"}
+              value={confirmPw}
+              onChange={(e) => setConfirmPw(e.target.value)}
+              dir="ltr"
+              autoComplete="new-password"
+              minLength={8}
+              maxLength={128}
+              className="cursor-text focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            />
+            {confirmPw.length > 0 && confirmPw !== newPassword && (
+              <p className="text-[10px] text-destructive">رمز و تکرار آن یکسان نیستند.</p>
+            )}
+          </div>
+          <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+            <input
+              type="checkbox"
+              checked={show}
+              onChange={(e) => setShow(e.target.checked)}
+              className="size-4 cursor-pointer accent-primary"
+            />
+            نمایش رمز
+          </label>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={onClose}
+              className="cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              انصراف
+            </Button>
+            <Button
+              type="submit"
+              disabled={!canSubmit}
+              className="gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+            >
+              {mut.isPending ? <Loader2Icon className="size-4 animate-spin" /> : <KeyRoundIcon className="size-4" />}
+              بازنشانی رمز
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 export function AdminUsersView(props: AdminUsersViewProps) {

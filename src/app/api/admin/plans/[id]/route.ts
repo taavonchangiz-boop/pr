@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRole, clientIp, audit, AuthError } from "@/lib/server/auth";
 import { db } from "@/lib/db";
+import { parsePlanFeatures, type PlanFeatures } from "@/lib/payments/plans";
 
 const PatchSchema = z.object({
   nameFa: z.string().min(2).max(80).optional(),
@@ -10,6 +11,12 @@ const PatchSchema = z.object({
   priceRials: z.number().int().nonnegative().optional(),
   intervalMonths: z.number().int().min(1).max(12).optional(),
   quota: z.record(z.string(), z.number()).optional(),
+  features: z.record(z.string(), z.union([z.boolean(), z.number()])).optional(),
+  imageUrl: z.string().max(2048).nullable().optional(),
+  discountPct: z.number().int().min(0).max(100).optional(),
+  renewalDiscountPct: z.number().int().min(0).max(100).optional(),
+  renewalDiscountWindowDays: z.number().int().min(0).max(365).optional(),
+  sortOrder: z.number().int().optional(),
   active: z.boolean().optional(),
   isPublic: z.boolean().optional(),
 });
@@ -43,6 +50,15 @@ export async function PATCH(
   if (parsed.data.priceRials !== undefined) data.priceRials = parsed.data.priceRials;
   if (parsed.data.intervalMonths !== undefined) data.intervalMonths = parsed.data.intervalMonths;
   if (parsed.data.quota !== undefined) data.quota = JSON.stringify(parsed.data.quota);
+  if (parsed.data.features !== undefined) {
+    const features: PlanFeatures = parsePlanFeatures(JSON.stringify(parsed.data.features));
+    data.features = JSON.stringify(features);
+  }
+  if (parsed.data.imageUrl !== undefined) data.imageUrl = parsed.data.imageUrl ?? null;
+  if (parsed.data.discountPct !== undefined) data.discountPct = parsed.data.discountPct;
+  if (parsed.data.renewalDiscountPct !== undefined) data.renewalDiscountPct = parsed.data.renewalDiscountPct;
+  if (parsed.data.renewalDiscountWindowDays !== undefined) data.renewalDiscountWindowDays = parsed.data.renewalDiscountWindowDays;
+  if (parsed.data.sortOrder !== undefined) data.sortOrder = parsed.data.sortOrder;
   if (parsed.data.active !== undefined) data.active = parsed.data.active;
   if (parsed.data.isPublic !== undefined) data.isPublic = parsed.data.isPublic;
   await db.plan.update({ where: { id }, data });

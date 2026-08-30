@@ -233,3 +233,63 @@
   font-weight: 500;
   font-size: 0.85rem;
 }
+
+/* =====================================================================
+   RTL OVERRIDES (items 24, 25, 27)
+   shadcn/ui components ship with `text-left` / `sm:text-left` defaults that
+   look wrong in our `dir="rtl"` app. These overrides force right-alignment
+   for all Persian-content surfaces: tables, dropdowns, select content,
+   dialog headers, etc. Latin/mono inputs explicitly opting into LTR via
+   `dir="ltr"` are left alone.
+   ===================================================================== */
+[dir="rtl"] table th,
+[dir="rtl"] .table-head,
+[dir="rtl"] [data-slot="dialog-header"],
+[dir="rtl"] [data-slot="select-content"],
+[dir="rtl"] [data-slot="dropdown-menu-content"],
+[dir="rtl"] [data-slot="menubar-content"],
+[dir="rtl"] [data-slot="navigation-menu-content"],
+[dir="rtl"] [data-slot="accordion-trigger"],
+[dir="rtl"] [data-slot="collapsible-trigger"],
+[dir="rtl"] [data-slot="popover-content"],
+[dir="rtl"] [data-slot="hover-card-content"],
+[dir="rtl"] [data-slot="command"],
+[dir="rtl"] [data-slot="listbox"],
+[dir="rtl"] [data-slot="tooltip-content"] {
+  text-align: right;
+}
+
+/* shadcn Select/Dropdown items: the label text inside should hug the right
+   (start) edge in RTL, not the left. */
+[dir="rtl"] [data-slot="select-item"],
+[dir="rtl"] [data-slot="dropdown-menu-item"],
+[dir="rtl"] [data-slot="menubar-item"],
+[dir="rtl"] [data-slot="context-menu-item"] {
+  text-align: right;
+}
+
+/* In RTL, justify-end becomes the visual LEFT; for table headers we want
+   labels at the visual RIGHT (start). Force a sensible default for table
+   header cells that only set text-left. */
+[dir="rtl"] thead th {
+  text-align: right;
+}
+
+/* Tables: switch the cell text to right unless the cell explicitly opts into
+   LTR (e.g. card numbers / tokens / emails) via dir="ltr". */
+[dir="rtl"] table td:not([dir="ltr"]):not(.ltr) {
+  text-align: right;
+}
+
+/* Tabular numbers (card numbers, IDs) keep LTR direction but should
+   still be right-aligned within their cell so the row stays balanced. */
+[dir="rtl"] table td[dir="ltr"] {
+  text-align: right;
+}
+
+/* Dialog: the default `sm:text-left` on the header should be centered/right
+   in RTL. We center form popups explicitly; for content dialogs use right. */
+[dir="rtl"] [data-slot="dialog-header"] {
+  text-align: center;
+}
+

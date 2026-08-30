@@ -1,10 +1,13 @@
 // POSTYAR — GET /api/me/usage
 // Plan usage snapshot for the signed-in user: the active plan's quotas vs.
-// consumed amounts + remaining days. Powers the dashboard "consumption
-// counter" widget (remaining days / posts / AI / channels).
+// consumed amounts + remaining days + the parsed `planFeatures` map (so the
+// dashboard can gate nav items by the active subscription's plan features).
+// Powers the dashboard "consumption counter" widget + the
+// subscription-gated menu (Item 9 of the dashboard redesign integration).
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireUser, AuthError, safeJsonParse } from "@/lib/server/auth";
+import { parsePlanFeatures, type PlanFeatures } from "@/lib/payments/plans";
 
 export async function GET() {
   let user;
@@ -37,6 +40,11 @@ export async function GET() {
         channelsUsed: destinationsCount,
         channelsQuota: 0,
         endsAt: null,
+        // No active subscription → no plan features → the dashboard shows
+        // only the always-on "account essentials" nav items + an upgrade
+        // CTA when the user tries to reach a gated feature.
+        planFeatures: {} as PlanFeatures,
+        planCode: null,
       });
     }
 
@@ -48,6 +56,7 @@ export async function GET() {
     return NextResponse.json({
       hasActivePlan: true,
       planName: sub.plan.nameFa,
+      planCode: sub.plan.code,
       intervalMonths: sub.plan.intervalMonths,
       remainingDays,
       publishUsed: used.publishUsed ?? 0,
@@ -57,6 +66,10 @@ export async function GET() {
       channelsUsed: destinationsCount,
       channelsQuota: quota.channels ?? 0,
       endsAt: sub.endsAt.toISOString(),
+      // The parsed `PlanFeatures` map (booleans + numerics) from
+      // Plan.features. Used by the dashboard to gate nav items + render the
+      // «ارتقای پلن» upgrade card when the user lands on a gated view.
+      planFeatures: parsePlanFeatures(sub.plan.features) as PlanFeatures,
     });
   } catch (e) {
     return NextResponse.json({ errorFa: "خطا در خواندن مصرف پلن.", detail: String(e) }, { status: 500 });

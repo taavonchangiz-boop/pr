@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { requireRole, AuthError } from "@/lib/server/auth";
-import { formatCompactRials, toPersianDigits } from "@/lib/persian";
+import { formatCompactRials, formatJalaliDateTime } from "@/lib/persian";
 
 export async function GET() {
   let admin;
@@ -148,7 +148,10 @@ export async function GET() {
       audit: auditTotal,
       growth: { thisWeek: thisWeekP, lastWeek: lastWeekP, pct: growthPct },
       topPublishers,
-      generatedAtFa: toPersianDigits(new Date().toISOString()),
+      // Jalali-formatted generation timestamp (Tehran TZ, with HH:mm) so the
+      // admin UI never shows a Gregorian date anywhere.
+      generatedAtFa: formatJalaliDateTime(new Date(), { withTime: true }),
+      generatedAt: new Date().toISOString(),
     });
   } catch (e) {
     return NextResponse.json({ errorFa: "خطا در محاسبهٔ آمار مدیریت.", detail: String(e) }, { status: 500 });

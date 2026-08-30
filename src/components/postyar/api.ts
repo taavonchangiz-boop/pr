@@ -89,6 +89,49 @@ export type PlanQuota = {
   [key: string]: number | undefined;
 };
 
+// =====================================================================
+// Granular plan features (ITEM 31). Mirrors src/lib/payments/plans.ts.
+// Persisted in Plan.features as JSON { featureKey: boolean | number }.
+// =====================================================================
+export type PlanBooleanFeatureKey =
+  | "publish"
+  | "schedule"
+  | "multiChannel"
+  | "bot"
+  | "workflow"
+  | "linkCodes"
+  | "broadcast"
+  | "glassButtons"
+  | "caption"
+  | "smartText"
+  | "smartReply"
+  | "autoResponder"
+  | "inbox"
+  | "woo"
+  | "goldBot"
+  | "goldMonitor"
+  | "advertising"
+  | "referral"
+  | "wallet"
+  | "tickets"
+  | "stats"
+  | "automation"
+  | "apiAccess";
+
+export type PlanNumericFeatureKey =
+  | "publishPerMonth"
+  | "aiPerMonth"
+  | "channels"
+  | "bots"
+  | "destinations"
+  | "contentItems"
+  | "glassButtonsPerDest"
+  | "workflowSteps";
+
+export type PlanFeatureKey = PlanBooleanFeatureKey | PlanNumericFeatureKey;
+
+export type PlanFeatures = Partial<Record<PlanFeatureKey, boolean | number>>;
+
 export type PlanRow = {
   id: string;
   code: string;
@@ -98,6 +141,12 @@ export type PlanRow = {
   priceRialsFa: string;
   intervalMonths: number;
   quota: PlanQuota;
+  features: PlanFeatures;
+  imageUrl: string | null;
+  discountPct: number;
+  renewalDiscountPct: number;
+  renewalDiscountWindowDays: number;
+  sortOrder: number;
   active: boolean;
   isPublic: boolean;
 };
@@ -284,6 +333,8 @@ export type TicketRow = {
   ownerNameFa?: string;
   assignedToId?: string | null;
   assignedToNameFa?: string | null;
+  departmentId?: string | null;
+  departmentNameFa?: string | null;
   createdAt: string;
   createdAtFa?: string;
   updatedAt: string;
@@ -297,6 +348,28 @@ export type TicketReplyRow = {
   body: string;
   isStaff: boolean;
   createdAt: string;
+};
+
+export type TicketAttachmentRow = {
+  id: string;
+  fileName: string;
+  mime: string;
+  sizeBytes: number;
+  createdAt: string;
+  createdAtFa?: string;
+};
+
+export type TicketDepartmentRow = {
+  id: string;
+  nameFa: string;
+  descriptionFa: string;
+  priority: number;
+  active: boolean;
+  ticketCount: number;
+  createdAt: string;
+  createdAtFa: string;
+  updatedAt: string;
+  updatedAtFa: string;
 };
 
 export type GoldPriceRow = {
@@ -460,6 +533,7 @@ export type TicketReplyView = {
   authorNameFa: string;
   createdAt: string;
   createdAtFa: string;
+  attachments?: TicketAttachmentRow[];
 };
 
 export type NotificationView = {
@@ -616,12 +690,39 @@ export type AdminPlanRow = {
   priceRialsFa: string;
   intervalMonths: number;
   quota: PlanQuota;
+  features: PlanFeatures;
+  imageUrl: string | null;
+  discountPct: number;
+  renewalDiscountPct: number;
+  renewalDiscountWindowDays: number;
+  sortOrder: number;
   active: boolean;
   isPublic: boolean;
   subscriptionCount: number;
   createdAt: string;
   createdAtFa: string;
 };
+
+/** Input body for POST /api/admin/plans (create). */
+export type AdminPlanInput = {
+  code: string;
+  nameFa: string;
+  descriptionFa?: string;
+  priceRials: number;
+  intervalMonths: number;
+  quota?: PlanQuota;
+  features?: PlanFeatures;
+  imageUrl?: string | null;
+  discountPct?: number;
+  renewalDiscountPct?: number;
+  renewalDiscountWindowDays?: number;
+  sortOrder?: number;
+  active?: boolean;
+  isPublic?: boolean;
+};
+
+/** Input body for PATCH /api/admin/plans/[id] (partial update). */
+export type AdminPlanPatch = Partial<Omit<AdminPlanInput, "code">>;
 
 export type AdminAuditRow = {
   id: string;
@@ -678,18 +779,36 @@ export type AdminOrderRow = {
   id: string;
   userId: string;
   userEmail: string;
+  userMobile?: string;
   userFullName: string;
   kind: string;
   kindFa: string;
   amountRials: number;
   amountFa: string;
   status: string;
+  statusFa?: string;
   provider: OrderProvider;
   providerFa: string | null;
   descriptionFa: string;
+  planId?: string | null;
   createdAt: string;
   createdAtFa: string;
+  updatedAt?: string;
   receiptUrl?: string | null;
+  hasCardReceipt?: boolean;
+  receiptStatus?: string | null;
+  receiptReviewedAt?: string | null;
+};
+
+export type AdminOrdersQuery = {
+  page?: number;
+  pageSize?: number;
+  status?: string;
+  kind?: string;
+  provider?: string;
+  q?: string;
+  from?: string;
+  to?: string;
 };
 
 export type AdminSubscriptionRow = {
@@ -735,6 +854,8 @@ export type AdminTicketRow = {
   ownerNameFa: string;
   assignedToId: string | null;
   assignedToNameFa: string | null;
+  departmentId: string | null;
+  departmentNameFa: string | null;
   createdAt: string;
   createdAtFa: string;
   updatedAt: string;
@@ -747,6 +868,81 @@ export type AdminSettingRow = {
   value: string;
   updatedAt: string;
   updatedAtFa: string;
+};
+
+/** One setting definition — mirrors /api/admin/settings GET `groups[].keys[]`. */
+export type AdminSettingDef = {
+  key: string;
+  labelFa: string;
+  descFa: string;
+  sensitive?: boolean;
+  options?: { value: string; labelFa: string }[];
+  default?: string;
+};
+
+/** One settings group — mirrors /api/admin/settings GET `groups[]`. */
+export type AdminSettingGroup = {
+  id: "general" | "sms_panel" | "email_panel" | "bank_gateway" | "gold_config" | "ai_config" | "security";
+  titleFa: string;
+  descriptionFa: string;
+  keys: AdminSettingDef[];
+};
+
+/** Extended GET response — items + groups + allow-list. */
+export type AdminSettingsResponse = {
+  items: AdminSettingRow[];
+  allowedKeys: string[];
+  groups: AdminSettingGroup[];
+};
+
+/** GoldPriceConfig row (admin gold config). */
+export type GoldSource =
+  | "free_talaapi"
+  | "free_tgju"
+  | "free_bonmarket"
+  | "custom_json"
+  | "custom_token";
+
+export type AdminGoldConfigRow = {
+  source: GoldSource;
+  endpoint: string | null;
+  token: string | null;
+  selector18k: string | null;
+  selectorEmami: string | null;
+  selectorBahar: string | null;
+  selectorOunce: string | null;
+  refreshMinutes: number;
+  active: boolean;
+  updatedAt: string;
+  updatedAtFa: string;
+};
+
+export type AdminGoldConfigInput = {
+  source: GoldSource;
+  endpoint?: string | null;
+  token?: string | null;
+  selector18k?: string | null;
+  selectorEmami?: string | null;
+  selectorBahar?: string | null;
+  selectorOunce?: string | null;
+  refreshMinutes?: number;
+  active?: boolean;
+};
+
+export type AdminGoldRefreshPrice = {
+  instrument: string;
+  instrumentFa: string;
+  priceRials: number | null;
+  priceRialsFa: string | null;
+  errorFa?: string | null;
+};
+
+export type AdminGoldRefreshResult = {
+  ok: boolean;
+  fetchedAt: string;
+  fetchedAtFa: string;
+  prices: AdminGoldRefreshPrice[];
+  errorFa?: string;
 };
 
 export type AdminWooStoreRow = {
@@ -1123,7 +1319,7 @@ export const api = {
       credentials: "same-origin",
     }));
   },
-  async createBankRequest(input: { orderId: string; mode: "direct" | "intermediary" }): Promise<BankPaymentResult> {
+  async createBankRequest(input: { orderId: string; mode?: "direct" | "intermediary" }): Promise<BankPaymentResult> {
     return jsonOrThrow(await fetch("/api/payments/bank", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1383,13 +1579,23 @@ export const api = {
       credentials: "same-origin",
     }));
   },
+  /**
+   * Admin-only: set a new password for a user. The admin cannot reset their
+   * own password through this endpoint (the server rejects it with 400);
+   * the regular /api/auth/me/password flow must be used for self-service.
+   */
+  async adminResetUserPassword(id: string, newPassword: string): Promise<{ ok: boolean }> {
+    return jsonOrThrow(await fetch(`/api/admin/users/${id}/reset-password`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ newPassword }),
+      credentials: "same-origin",
+    }));
+  },
   async getAdminPlansTyped(): Promise<{ items: AdminPlanRow[] }> {
     return jsonOrThrow(await fetch("/api/admin/plans", { credentials: "same-origin" }));
   },
-  async adminCreatePlan(body: {
-    code: string; nameFa: string; descriptionFa?: string; priceRials: number;
-    intervalMonths: number; quota?: PlanQuota; active?: boolean; isPublic?: boolean;
-  }): Promise<{ ok: boolean; planId: string }> {
+  async adminCreatePlan(body: AdminPlanInput): Promise<{ ok: boolean; planId: string }> {
     return jsonOrThrow(await fetch("/api/admin/plans", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1397,10 +1603,7 @@ export const api = {
       credentials: "same-origin",
     }));
   },
-  async adminUpdatePlan(id: string, body: Partial<{
-    nameFa: string; descriptionFa: string; priceRials: number;
-    intervalMonths: number; quota: PlanQuota; active: boolean; isPublic: boolean;
-  }>): Promise<{ ok: boolean }> {
+  async adminUpdatePlan(id: string, body: AdminPlanPatch): Promise<{ ok: boolean }> {
     return jsonOrThrow(await fetch(`/api/admin/plans/${id}`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
@@ -1485,7 +1688,7 @@ export const api = {
       credentials: "same-origin",
     }));
   },
-  async adminApproveOrder(id: string, notes?: string): Promise<{ ok: boolean }> {
+  async adminApproveOrder(id: string, notes?: string): Promise<{ ok: boolean; paidRials?: number; orderId?: string; status?: string }> {
     return jsonOrThrow(await fetch(`/api/admin/orders/${id}/approve`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1493,11 +1696,11 @@ export const api = {
       credentials: "same-origin",
     }));
   },
-  async adminRejectOrder(id: string, notes?: string): Promise<{ ok: boolean }> {
+  async adminRejectOrder(id: string, reason?: string): Promise<{ ok: boolean }> {
     return jsonOrThrow(await fetch(`/api/admin/orders/${id}/reject`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(notes ? { notes } : {}),
+      body: JSON.stringify(reason ? { reason } : {}),
       credentials: "same-origin",
     }));
   },
@@ -1510,13 +1713,31 @@ export const api = {
     const url = tail ? `/api/admin/subscriptions?${tail}` : "/api/admin/subscriptions";
     return jsonOrThrow(await fetch(url, { credentials: "same-origin" }));
   },
-  async getAdminOrdersTyped(): Promise<{ items: AdminOrderRow[] }> {
+  async getAdminOrdersTyped(params?: AdminOrdersQuery): Promise<{ orders: AdminOrderRow[]; items: AdminOrderRow[]; total: number; page: number; pageSize: number }> {
+    const qs = new URLSearchParams();
+    if (params?.page) qs.set("page", String(params.page));
+    if (params?.pageSize) qs.set("pageSize", String(params.pageSize));
+    if (params?.status) qs.set("status", params.status);
+    if (params?.kind) qs.set("kind", params.kind);
+    if (params?.provider) qs.set("provider", params.provider);
+    if (params?.q) qs.set("q", params.q);
+    if (params?.from) qs.set("from", params.from);
+    if (params?.to) qs.set("to", params.to);
+    const tail = qs.toString();
+    const url = tail ? `/api/admin/orders?${tail}` : "/api/admin/orders";
     // Best-effort: returns empty list if the admin list endpoint isn't built yet.
     try {
-      const data = await jsonOrThrow(await fetch("/api/admin/orders", { credentials: "same-origin" }));
-      return { items: data.items ?? [] };
+      const data = await jsonOrThrow(await fetch(url, { credentials: "same-origin" }));
+      const orders: AdminOrderRow[] = data.orders ?? data.items ?? [];
+      return {
+        orders,
+        items: orders, // backward-compat alias for legacy callers
+        total: data.total ?? 0,
+        page: data.page ?? 1,
+        pageSize: data.pageSize ?? 20,
+      };
     } catch {
-      return { items: [] };
+      return { orders: [], items: [], total: 0, page: 1, pageSize: 20 };
     }
   },
   async getAdminBotsTyped(): Promise<{ items: AdminBotRow[] }> {
@@ -1538,12 +1759,13 @@ export const api = {
       credentials: "same-origin",
     }));
   },
-  async getAdminTicketsTyped(params?: { limit?: number; offset?: number; status?: string; assignedToId?: string | null }): Promise<{ items: AdminTicketRow[]; total: number }> {
+  async getAdminTicketsTyped(params?: { limit?: number; offset?: number; status?: string; assignedToId?: string | null; departmentId?: string | null }): Promise<{ items: AdminTicketRow[]; total: number }> {
     const qs = new URLSearchParams();
     if (params?.limit) qs.set("limit", String(params.limit));
     if (params?.offset) qs.set("offset", String(params.offset));
     if (params?.status) qs.set("status", params.status);
     if (params?.assignedToId !== undefined) qs.set("assignedToId", params.assignedToId ?? "null");
+    if (params?.departmentId !== undefined) qs.set("departmentId", params.departmentId ?? "null");
     const tail = qs.toString();
     const url = tail ? `/api/admin/tickets?${tail}` : "/api/admin/tickets";
     return jsonOrThrow(await fetch(url, { credentials: "same-origin" }));
@@ -1556,7 +1778,94 @@ export const api = {
       credentials: "same-origin",
     }));
   },
-  async getAdminSettingsTyped(): Promise<{ items: AdminSettingRow[]; allowedKeys: string[] }> {
+  async adminAssignTicketFields(ticketId: string, body: {
+    departmentId?: string | null;
+    assignedToId?: string | null;
+    priority?: "low" | "normal" | "high" | "urgent";
+  }): Promise<{ ok: boolean }> {
+    return jsonOrThrow(await fetch(`/api/admin/tickets/${ticketId}/assign`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      credentials: "same-origin",
+    }));
+  },
+  async getTicketDepartments(): Promise<{ items: TicketDepartmentRow[] }> {
+    return jsonOrThrow(await fetch("/api/admin/tickets/departments", { credentials: "same-origin" }));
+  },
+  async adminCreateDepartment(body: {
+    nameFa: string;
+    descriptionFa?: string;
+    priority?: number;
+    active?: boolean;
+  }): Promise<{ ok: boolean; department: TicketDepartmentRow }> {
+    return jsonOrThrow(await fetch("/api/admin/tickets/departments", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      credentials: "same-origin",
+    }));
+  },
+  async adminUpdateDepartment(id: string, body: Partial<{
+    nameFa: string;
+    descriptionFa: string;
+    priority: number;
+    active: boolean;
+  }>): Promise<{ ok: boolean }> {
+    return jsonOrThrow(await fetch(`/api/admin/tickets/departments/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      credentials: "same-origin",
+    }));
+  },
+  async adminDeleteDepartment(id: string): Promise<{ ok: boolean }> {
+    return jsonOrThrow(await fetch(`/api/admin/tickets/departments/${id}`, {
+      method: "DELETE",
+      credentials: "same-origin",
+    }));
+  },
+  /**
+   * POST a reply with optional attachments (multipart/form-data).
+   * The fetch is `credentials: "same-origin"` so the session cookie is sent.
+   * The returned `reply` carries the same shape as the JSON reply route, but
+   * `attachments` is always populated when files are attached.
+   */
+  async replyTicketWithAttachments(
+    ticketId: string,
+    body: string,
+    files: File[],
+    opts?: { close?: boolean },
+  ): Promise<{ ok: boolean; reply: TicketReplyView }> {
+    const fd = new FormData();
+    fd.append("body", body);
+    if (opts?.close) fd.append("close", "true");
+    for (const f of files) {
+      fd.append("files", f, f.name);
+    }
+    const r = await fetch(`/api/tickets/${ticketId}/replies`, {
+      method: "POST",
+      body: fd,
+      credentials: "same-origin",
+    });
+    const data = await r.json().catch(() => ({}));
+    if (!r.ok) {
+      throw new Error((data as { errorFa?: string })?.errorFa ?? `خطای ${r.status}`);
+    }
+    if (!(data as { reply?: TicketReplyView }).reply) {
+      throw new Error((data as { errorFa?: string })?.errorFa ?? "ثبت پاسخ ناموفق بود.");
+    }
+    return { ok: true, reply: (data as { reply: TicketReplyView }).reply };
+  },
+  /**
+   * Returns the URL to stream a single attachment. The endpoint enforces
+   * owner-or-staff authorization; do NOT expose this URL to non-authorized
+   * users (the API will 403 them anyway, but better to not even render).
+   */
+  getTicketAttachmentUrl(ticketId: string, attachmentId: string): string {
+    return `/api/tickets/${ticketId}/attachments/${attachmentId}`;
+  },
+  async getAdminSettingsTyped(): Promise<AdminSettingsResponse> {
     return jsonOrThrow(await fetch("/api/admin/settings", { credentials: "same-origin" }));
   },
   async adminUpdateSetting(key: string, value: string): Promise<{ ok: boolean; setting: AdminSettingRow }> {
@@ -1564,6 +1873,51 @@ export const api = {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ key, value }),
+      credentials: "same-origin",
+    }));
+  },
+  /**
+   * Batch save — accepts an array of {key, value} and upserts them in one
+   * PATCH request. Used by the grouped settings UI's per-card save.
+   */
+  async adminBatchUpdateSettings(items: Array<{ key: string; value: string }>): Promise<{ ok: boolean; count: number }> {
+    return jsonOrThrow(await fetch("/api/admin/settings", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ items }),
+      credentials: "same-origin",
+    }));
+  },
+  /**
+   * Delete a single SystemSetting row (revert to env / built-in default).
+   */
+  async adminResetSetting(key: string): Promise<{ ok: boolean }> {
+    return jsonOrThrow(await fetch("/api/admin/settings", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ key }),
+      credentials: "same-origin",
+    }));
+  },
+  /**
+   * GET the gold price config row (GoldPriceConfig model). Returns null
+   * when no row exists yet (the API defaults to { source: "free_talaapi"
+   * } server-side).
+   */
+  async getAdminGoldConfig(): Promise<AdminGoldConfigRow> {
+    return jsonOrThrow(await fetch("/api/admin/gold/config", { credentials: "same-origin" }));
+  },
+  async adminUpdateGoldConfig(body: AdminGoldConfigInput): Promise<{ ok: boolean; config: AdminGoldConfigRow }> {
+    return jsonOrThrow(await fetch("/api/admin/gold/config", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+      credentials: "same-origin",
+    }));
+  },
+  async adminRefreshGoldPrices(): Promise<AdminGoldRefreshResult> {
+    return jsonOrThrow(await fetch("/api/admin/gold/refresh", {
+      method: "POST",
       credentials: "same-origin",
     }));
   },

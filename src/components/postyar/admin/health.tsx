@@ -7,6 +7,11 @@
 // redis-shim marker. Each shows status badge (ok/warn/down) +
 // message + lastCheckedAt Jalali. «به‌روزرسانی» button.
 // =====================================================================
+// NOTE (ITEM 35): این بخش فقط برای مدیر سامانه قابل مشاهده است.
+// The route /api/admin/health enforces `requireRole(["admin"])` (NOT
+// `["admin","support"]`) — support agents cannot view the health
+// dashboard. The dashboard renders this view only for admins. See also
+// src/app/api/admin/health/route.ts.
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   ActivityIcon,

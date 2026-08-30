@@ -219,6 +219,19 @@ model Plan {
   priceRials    Int      @default(0)
   intervalMonths Int     @default(1)
   quota         String   @default("{}") // JSON: { publishPerMonth, aiPerMonth, channels, automation, ... }
+  // Granular feature flags (JSON object of feature-key -> boolean/number).
+  // Keys mirror the dashboard sections so admins can enable exactly the
+  // modules a plan grants (e.g. { caption: true, smartReply: true, woo: false, gold: true, ... }).
+  features      String   @default("{}")
+  // Marketing image for the plan card (public webp under /brand or /assets).
+  imageUrl      String?
+  // Optional percentage discount applied at checkout (0..100).
+  discountPct   Int      @default(0)
+  // Early-renewal discount: if the user renews within `renewalDiscountWindowDays`
+  // days before `endsAt`, this percentage is applied. 0 = no renewal discount.
+  renewalDiscountPct        Int  @default(0)
+  renewalDiscountWindowDays Int  @default(0)
+  sortOrder     Int      @default(0)
   active        Boolean  @default(true)
   isPublic      Boolean  @default(true)
   createdAt     DateTime @default(now())
@@ -412,7 +425,10 @@ model AdCampaign {
   descriptionFa String   @default("")
   link          String?
   imagePath     String?  // public webp under /assets/ads/
-  placement     String   @default("site_sidebar") // site_sidebar|landing|...
+  // Placement key references AdPlacement.key (e.g. user_dashboard_top, sticky_bar, landing_hero, ...).
+  // The admin defines every placement via the AdPlacement table; this string ties a campaign to a slot.
+  placement     String   @default("user_dashboard_top")
+  placementRel  AdPlacement? @relation(fields: [placement], references: [key], onDelete: NoAction)
   startAt       DateTime?
   endAt         DateTime?
   priceRials    Int      @default(0)
@@ -425,6 +441,23 @@ model AdCampaign {
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   @@index([status])
+  @@index([placement])
+}
+
+// Admin-defined ad placements. The admin can create any number of slots
+// (e.g. "sticky_bar", "user_dashboard_top", "user_dashboard_sidebar",
+// "landing_hero", "plans_page_banner", ...) and assign campaigns to them.
+model AdPlacement {
+  key           String   @id // unique stable key, e.g. "sticky_bar"
+  labelFa       String
+  descriptionFa String   @default("")
+  // kind: "sticky_bar" | "banner_inline" | "sidebar_card" | "fullscreen"
+  kind          String   @default("banner_inline")
+  active        Boolean  @default(true)
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  campaigns     AdCampaign[]
 }
 
 // ---------------------------------------------------------------------
@@ -500,14 +533,32 @@ model Ticket {
   user          User     @relation("UserTickets", fields: [userId], references: [id], onDelete: Cascade)
   subject       String
   category      String   @default("general")
+  departmentId  String?
+  department    TicketDepartment? @relation(fields: [departmentId], references: [id], onDelete: SetNull)
   status        String   @default("open") // open|answered|closed
-  priority      String   @default("normal") // low|normal|high
+  priority      String   @default("normal") // low|normal|high|urgent
   assignedToId  String?
   assignedTo    User?    @relation("SupportAssigned", fields: [assignedToId], references: [id])
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   replies       TicketReply[]
   @@index([userId])
+  @@index([departmentId])
+  @@index([status])
+}
+
+// Admin-defined ticket departments (e.g. "فنی", "مالی", "فروش").
+// Admin can CRUD these, set priority ordering, and assign tickets to them.
+model TicketDepartment {
+  id            String   @id @default(cuid())
+  nameFa        String   @unique
+  descriptionFa String   @default("")
+  // Lower number = higher priority in lists.
+  priority      Int      @default(100)
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  tickets       Ticket[]
 }
 
 model TicketReply {
@@ -519,7 +570,22 @@ model TicketReply {
   body          String
   isStaff       Boolean  @default(false)
   createdAt     DateTime @default(now())
+  attachments   TicketAttachment[]
   @@index([ticketId])
+}
+
+// Image / ZIP attachments on ticket replies. Only these two MIME groups
+// are allowed; max sizes enforced in the upload route (image ≤ 5 MiB, zip ≤ 10 MiB).
+model TicketAttachment {
+  id            String   @id @default(cuid())
+  replyId       String
+  reply         TicketReply @relation(fields: [replyId], references: [id], onDelete: Cascade)
+  fileName      String
+  mime          String   // image/* | application/zip
+  sizeBytes     Int
+  storagePath   String   // under /storage/tickets/
+  createdAt     DateTime @default(now())
+  @@index([replyId])
 }
 
 // ---------------------------------------------------------------------
@@ -536,6 +602,48 @@ model Notification {
   readAt        DateTime?
   createdAt     DateTime @default(now())
   @@index([userId])
+}
+
+// Admin-segmented broadcast notifications. One BroadcastNotification row is
+// the template + audience; the actual per-user rows are fanned out into
+// Notification when the admin sends (or lazily via a worker). Audience can
+// be: "all" | "single" | "plan" | "plans" (multi-plan).
+model BroadcastNotification {
+  id            String   @id @default(cuid())
+  category      String
+  titleFa       String
+  bodyFa        String
+  link          String?
+  // "all" | "single" | "plan" | "plans"
+  audienceType  String   @default("all")
+  // JSON. For "single": { userId }. For "plan": { planId }. For "plans": { planIds: [] }.
+  audienceMeta  String   @default("{}")
+  sentById      String?
+  sentAt        DateTime @default(now())
+  recipientCount Int    @default(0)
+  @@index([sentAt])
+}
+
+// ---------------------------------------------------------------------
+// GOLD PRICE CONFIG
+// ---------------------------------------------------------------------
+// Admin-configurable source for gold prices. Either a custom token/JSON
+// endpoint OR one of the built-in free platforms (selectable).
+model GoldPriceConfig {
+  id            String   @id @default(cuid())
+  // "free_talaapi" | "free_tgju" | "free_bonmarket" | "custom_json" | "custom_token"
+  source        String   @default("free_talaapi")
+  // For custom_json: full URL returning JSON. For custom_token: auth bearer.
+  endpoint      String?
+  token         String?  // encrypted at rest by the crypto layer
+  // JSONPath-like selectors to extract each instrument's price from the response.
+  selector18k      String?
+  selectorEmami    String?
+  selectorBahar    String?
+  selectorOunce    String?
+  refreshMinutes   Int      @default(5)
+  active        Boolean  @default(true)
+  updatedAt    DateTime @updatedAt
 }
 
 // ---------------------------------------------------------------------

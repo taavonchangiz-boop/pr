@@ -98,7 +98,7 @@ function ExpandedDetail({ orderId }: { orderId: string }) {
         <DetailRow label="نوع سفارش" value={d.kind === "subscription" ? "اشتراک" : d.kind === "wallet_credit" ? "شارژ کیف پول" : d.kind} />
         <DetailRow label="مبلغ" value={<span className="tabular-nums">{d.amountFa ?? formatRials(d.amountRials)}</span>} />
         <DetailRow label="وضعیت" value={<StatusBadge status={d.status} />} />
-        <DetailRow label="ارائه‌دهنده" value={d.provider ? (d.provider === "card" ? "کارت به کارت" : d.provider === "bank" ? "درگاه بانکی" : d.provider === "bale" ? "پرداخت باه" : d.provider) : "—"} />
+        <DetailRow label="ارائه‌دهنده" value={d.provider ? (d.provider === "card" ? "کارت به کارت" : d.provider === "bank" ? "درگاه بانکی" : d.provider === "bale" ? "پرداخت با بله" : d.provider) : "—"} />
         <DetailRow label="مرجع ارائه‌دهنده" value={<span className="font-mono text-xs" dir="ltr">{d.providerRef ?? "—"}</span>} />
         <DetailRow label="تاریخ ایجاد" value={formatJalaliDateTime(d.createdAt, { withTime: true })} />
         <DetailRow label="به‌روزرسانی" value={formatJalaliDateTime(d.updatedAt, { withTime: true })} />
@@ -109,7 +109,7 @@ function ExpandedDetail({ orderId }: { orderId: string }) {
       )}
 
       {d.cardReceipt && (
-        <div className="rounded-md border bg-background p-3">
+        <div className="rounded-md border bg-background p-3" dir="rtl">
           <div className="mb-1 text-xs font-medium">فیش کارت به کارت</div>
           <div className="text-xs text-muted-foreground">
             وضعیت: <StatusBadge status={d.cardReceipt.status === "pending" ? "awaiting_review" : d.cardReceipt.status} />
@@ -133,7 +133,7 @@ function ExpandedDetail({ orderId }: { orderId: string }) {
 
       {d.baleRef && (
         <div className="rounded-md border bg-background p-3">
-          <div className="mb-1 text-xs font-medium">مرجع پرداخت باه</div>
+          <div className="mb-1 text-xs font-medium">مرجع پرداخت با بله</div>
           <div className="text-xs text-muted-foreground">
             ربات: <span dir="ltr" className="font-mono">{d.baleRef.botId ?? "—"}</span>{" "}
             {d.baleRef.chargeId && <span>— شناسهٔ واریز: <span dir="ltr" className="font-mono">{d.baleRef.chargeId}</span></span>}

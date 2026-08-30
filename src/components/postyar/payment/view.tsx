@@ -10,22 +10,28 @@
 //   - Order summary (plan name + price + discount input + «اعتبارسنجی»)
 //   - Payment method radio cards (3 options):
 //       1) کارت به کارت — destination bank cards + receipt upload
-//       2) درگاه بانکی (مستقیم / واسطه) — POST /api/payments/bank → redirect
-//       3) پرداخت باه — POST /api/payments/bale → show botInvoiceUrl
+//       2) درگاه بانکی — POST /api/payments/bank → redirect.
+//          (ITEM 41 — the direct/intermediary distinction is no longer
+//          exposed to the user; the backend resolves "direct" by
+//          default and the user just clicks «پرداخت از طریق درگاه».)
+//       3) پرداخت با بله — POST /api/payments/bale → show botInvoiceUrl
 // =====================================================================
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import {
   AlertCircleIcon,
   ArrowLeftIcon,
   BanknoteIcon,
+  CheckIcon,
   CheckCircle2Icon,
+  CopyIcon,
   CreditCardIcon,
   ExternalLinkIcon,
   Loader2Icon,
   ReceiptIcon,
   ShieldCheckIcon,
+  SquareIcon,
   UploadIcon,
   WalletIcon,
 } from "lucide-react";
@@ -39,12 +45,13 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { cn } from "@/lib/utils";
-import { api, type PlanRow } from "@/components/postyar/api";
+import { api, type BankCardRow, type PlanRow } from "@/components/postyar/api";
 import { useSession } from "@/components/layout/session-provider";
 import {
   formatRials,
   toPersianDigits,
 } from "@/lib/persian";
+import { getBankMeta } from "@/lib/payments/banks";
 
 export interface PaymentViewProps {
   navigate: (to: string) => void;
@@ -56,12 +63,7 @@ type PaymentMethod = "card" | "bank" | "bale";
 const METHOD_LABELS: Record<PaymentMethod, string> = {
   card: "کارت به کارت",
   bank: "درگاه بانکی",
-  bale: "پرداخت باه",
-};
-
-const BANK_MODE_LABELS: Record<"direct" | "intermediary", string> = {
-  direct: "مستقیم",
-  intermediary: "واسطه",
+  bale: "پرداخت با بله",
 };
 
 function planOrderStorageKey(userId: string | undefined, planId: string) {
@@ -196,20 +198,71 @@ function DiscountValidator({
 
 function CardToCardSection({
   orderId,
+  amount,
   navigate,
 }: {
   orderId: string;
+  amount: number;
   navigate: (to: string) => void;
 }) {
   const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const cards = useQuery({
     queryKey: ["payment", "bank-cards"],
     queryFn: () => api.getBankCards(),
     staleTime: 60_000,
   });
+
+  // -------------------------------------------------------------------
+  // Copy-to-clipboard — uses navigator.clipboard.writeText on HTTPS,
+  // falls back to a hidden textarea + document.execCommand("copy") for
+  // older browsers / non-secure contexts.
+  // -------------------------------------------------------------------
+  const copyCardNumber = useCallback(async (card: BankCardRow) => {
+    const raw = card.cardNumberMask ?? "";
+    const digits = raw.replace(/[^\d]/g, "");
+    if (!digits) {
+      toast.error("شماره کارت قابل کپی نیست.");
+      return;
+    }
+    let ok = false;
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(digits);
+        ok = true;
+      }
+    } catch {
+      ok = false;
+    }
+    if (!ok) {
+      try {
+        const ta = document.createElement("textarea");
+        ta.value = digits;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.top = "-9999px";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        const ran = document.execCommand?.("copy");
+        document.body.removeChild(ta);
+        ok = !!ran;
+      } catch {
+        ok = false;
+      }
+    }
+    if (ok) {
+      toast.success("شماره کارت کپی شد.");
+      setCopiedId(card.id);
+      window.setTimeout(() => setCopiedId((id) => (id === card.id ? null : id)), 1500);
+    } else {
+      toast.error("کپی ناموفق بود. شماره را به‌صورت دستی وارد کنید.");
+    }
+  }, []);
 
   const submit = useMutation({
     mutationFn: async () => {
@@ -236,28 +289,35 @@ function CardToCardSection({
   });
 
   return (
-    <div className="flex flex-col gap-4" dir="rtl">
+    <div className="flex flex-col gap-5" dir="rtl">
+      {/* ---------------------------------- beautiful card list */}
       <div>
-        <h4 className="mb-2 text-sm font-medium">کارت‌های مقصد</h4>
+        <h4 className="mb-3 flex items-center gap-2 text-sm font-medium">
+          <CreditCardIcon className="size-4 text-primary" />
+          کارت‌های مقصد
+        </h4>
         {cards.isLoading ? (
-          <div className="flex flex-col gap-2">
-            <Skeleton className="h-14 w-full" />
-            <Skeleton className="h-14 w-full" />
+          <div className="flex flex-col gap-3">
+            <Skeleton className="h-40 w-full max-w-md" />
+            <Skeleton className="h-40 w-full max-w-md" />
           </div>
+        ) : cards.error ? (
+          <Alert variant="destructive">
+            <AlertCircleIcon className="size-4" />
+            <AlertTitle>بارگذاری ناموفق</AlertTitle>
+            <AlertDescription className="text-xs">
+              کارت‌های مقصد بارگذاری نشدند. بعداً تلاش کنید.
+            </AlertDescription>
+          </Alert>
         ) : cards.data && cards.data.length > 0 ? (
-          <ul className="flex flex-col gap-2">
+          <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {cards.data.map((c) => (
-              <li
-                key={c.id}
-                className="flex items-center justify-between rounded-md border bg-muted/30 p-3 text-sm"
-              >
-                <div className="flex flex-col gap-0.5">
-                  <span className="font-medium tabular-nums" dir="ltr">
-                    {c.cardNumberMask}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{c.bankName}</span>
-                </div>
-                <span className="text-xs">{c.holderName}</span>
+              <li key={c.id}>
+                <BeautifulBankCard
+                  card={c}
+                  copied={copiedId === c.id}
+                  onCopy={() => copyCardNumber(c)}
+                />
               </li>
             ))}
           </ul>
@@ -267,6 +327,14 @@ function CardToCardSection({
           </p>
         )}
       </div>
+
+      {/* ---------------------------------- amount to pay */}
+      {amount > 0 && (
+        <div className="flex items-center justify-between rounded-lg border bg-muted/30 px-4 py-3" dir="rtl">
+          <span className="text-sm text-muted-foreground">مبلغ قابل پرداخت</span>
+          <span className="text-xl font-bold tabular-nums">{formatRials(amount)}</span>
+        </div>
+      )}
 
       <Alert>
         <AlertCircleIcon className="size-4" />
@@ -278,15 +346,16 @@ function CardToCardSection({
       </Alert>
 
       <div className="flex flex-col gap-2">
-        <Label htmlFor="receipt-file" className="text-xs text-muted-foreground">
-          فیش پرداخت (تصویر)
+        <Label htmlFor="receipt-file" className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          <UploadIcon className="size-3.5" />
+          بارگذاری رسید (تصویر فیش)
         </Label>
         <Input
           id="receipt-file"
           type="file"
           accept="image/*"
           onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="text-xs"
+          className="text-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         />
         {file && (
           <div className="text-xs text-muted-foreground">
@@ -297,15 +366,100 @@ function CardToCardSection({
         <Button
           onClick={() => submit.mutate()}
           disabled={!file || uploading || submit.isPending}
-          className="gap-2"
+          className="gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           {uploading || submit.isPending ? (
             <Loader2Icon className="size-4 animate-spin" />
           ) : (
             <UploadIcon className="size-4" />
           )}
-          ثبت فیش
+          بارگذاری رسید
         </Button>
+      </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// BeautifulBankCard — credit-card-style gradient display.
+// ---------------------------------------------------------------------
+function BeautifulBankCard({
+  card,
+  copied,
+  onCopy,
+}: {
+  card: BankCardRow;
+  copied: boolean;
+  onCopy: () => void;
+}) {
+  const meta = getBankMeta(card.bankName);
+  // Convert "1234-5678-9012-3456" (or any format) → Persian-digit groups
+  // separated by spaces, rendered LTR (digits stay LTR, but Persian glyphs).
+  // For legacy masked rows ("1234-****-****-5678") we keep the asterisks
+  // — those rows pre-date the full-PAN storage change.
+  const formattedNumber = (card.cardNumberMask ?? "")
+    .replace(/-/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .split(" ")
+    .map((group) => toPersianDigits(group))
+    .join(" ");
+  return (
+    <div
+      dir="rtl"
+      className={cn(
+        "motion-safe:transition-transform motion-safe:hover:-translate-y-1 motion-safe:hover:shadow-xl",
+        "relative flex aspect-[1.586] w-full flex-col justify-between rounded-2xl p-5 text-white shadow-lg ring-1 ring-black/10",
+      )}
+      style={{ background: meta.gradient }}
+    >
+      {/* top row — bank name + chip */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="flex flex-col">
+          <span className="text-[10px] opacity-70">بانک</span>
+          <span className="text-sm font-semibold drop-shadow-sm">{card.bankName}</span>
+        </div>
+        <SquareIcon
+          aria-hidden
+          className="size-7 shrink-0 rounded-md bg-gradient-to-br from-amber-200 to-amber-400 text-amber-700/40"
+        />
+      </div>
+
+      {/* card number — center */}
+      <div className="flex flex-col gap-0.5">
+        <span className="text-[10px] opacity-70">شماره کارت</span>
+        <div
+          dir="ltr"
+          className="font-mono text-base tracking-[0.15em] tabular-nums drop-shadow-sm sm:text-lg"
+        >
+          {formattedNumber}
+        </div>
+      </div>
+
+      {/* holder + copy */}
+      <div className="flex items-end justify-between gap-2">
+        <div className="flex flex-col">
+          <span className="text-[10px] opacity-70">صاحب کارت</span>
+          <span className="text-sm font-semibold drop-shadow-sm">{card.holderName}</span>
+        </div>
+        <button
+          type="button"
+          onClick={onCopy}
+          className="inline-flex cursor-pointer items-center gap-1 rounded-full bg-white/15 px-3 py-1 text-xs backdrop-blur-sm transition-colors hover:bg-white/25 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
+          aria-label="کپی کردن شماره کارت"
+        >
+          {copied ? (
+            <>
+              <CheckIcon className="size-3.5" />
+              کپی شد
+            </>
+          ) : (
+            <>
+              <CopyIcon className="size-3.5" />
+              کپی شماره
+            </>
+          )}
+        </button>
       </div>
     </div>
   );
@@ -316,11 +470,13 @@ function BankGatewaySection({
 }: {
   orderId: string;
 }) {
-  const [mode, setMode] = useState<"direct" | "intermediary">("direct");
+  // ITEM 41 — the direct/intermediary mode is no longer a user choice.
+  // The backend resolves "direct" by default; the user just clicks the
+  // single «پرداخت از طریق درگاه» button.
   const qc = useQueryClient();
 
   const create = useMutation({
-    mutationFn: () => api.createBankRequest({ orderId, mode }),
+    mutationFn: () => api.createBankRequest({ orderId }),
     onSuccess: (data) => {
       if (data.ok && data.redirectUrl) {
         toast.success("در حال انتقال به درگاه بانکی...");
@@ -338,28 +494,6 @@ function BankGatewaySection({
 
   return (
     <div className="flex flex-col gap-4" dir="rtl">
-      <div>
-        <Label className="mb-2 block text-xs text-muted-foreground">نوع درگاه</Label>
-        <RadioGroup
-          value={mode}
-          onValueChange={(v) => setMode(v as "direct" | "intermediary")}
-          className="grid grid-cols-2 gap-2"
-        >
-          {(["direct", "intermediary"] as const).map((m) => (
-            <label
-              key={m}
-              className={cn(
-                "flex cursor-pointer items-center gap-2 rounded-md border p-3 text-sm transition-colors",
-                mode === m ? "border-primary bg-primary/5" : "hover:bg-muted/50",
-              )}
-              htmlFor={`bank-mode-${m}`}
-            >
-              <RadioGroupItem value={m} id={`bank-mode-${m}`} />
-              <span>{BANK_MODE_LABELS[m]}</span>
-            </label>
-          ))}
-        </RadioGroup>
-      </div>
       <Alert>
         <ShieldCheckIcon className="size-4" />
         <AlertTitle>امنیت تراکنش</AlertTitle>
@@ -368,7 +502,11 @@ function BankGatewaySection({
           پرداخت، به‌صورت خودکار به پُست‌یار بازمی‌گردید.
         </AlertDescription>
       </Alert>
-      <Button onClick={() => create.mutate()} disabled={create.isPending} className="gap-2">
+      <Button
+        onClick={() => create.mutate()}
+        disabled={create.isPending}
+        className="gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+      >
         {create.isPending ? <Loader2Icon className="size-4 animate-spin" /> : <CreditCardIcon className="size-4" />}
         پرداخت از طریق درگاه
       </Button>
@@ -399,13 +537,13 @@ function BalePaymentSection({
     onSuccess: (data) => {
       if (data.ok && data.botInvoiceUrl) {
         setInvoiceUrl(data.botInvoiceUrl);
-        toast.success("فاکتور پرداخت باه ایجاد شد.");
+        toast.success("فاکتور پرداخت با بله ایجاد شد.");
       } else {
-        toast.error(data.errorFa ?? "ایجاد فاکتور باه ناموفق بود.");
+        toast.error(data.errorFa ?? "ایجاد فاکتور بله ناموفق بود.");
       }
     },
     onError: (e: Error) => {
-      toast.error(e.message ?? "ایجاد فاکتور باه ناموفق بود.");
+      toast.error(e.message ?? "ایجاد فاکتور بله ناموفق بود.");
     },
   });
 
@@ -416,7 +554,7 @@ function BalePaymentSection({
       ) : bots.data && bots.data.length > 0 ? (
         <div className="flex flex-col gap-2">
           <Label htmlFor="bale-bot" className="text-xs text-muted-foreground">
-            ربات باه
+            ربات بله
           </Label>
           <select
             id="bale-bot"
@@ -435,9 +573,9 @@ function BalePaymentSection({
       ) : (
         <Alert>
           <AlertCircleIcon className="size-4" />
-          <AlertTitle>ربات باه فعال ندارید</AlertTitle>
+          <AlertTitle>ربات بله فعال ندارید</AlertTitle>
           <AlertDescription className="text-xs">
-            برای پرداخت باه، ابتدا یک ربات باه فعال در بخش «بات‌ساز» اضافه کنید و
+            برای پرداخت با بله، ابتدا یک ربات بله فعال در بخش «بات‌ساز» اضافه کنید و
             سپس /start را در ربات بزنید تا چت آی‌دی شما مشخص شود.
           </AlertDescription>
         </Alert>
@@ -445,7 +583,7 @@ function BalePaymentSection({
 
       <div className="flex flex-col gap-2">
         <Label htmlFor="bale-chat-id" className="text-xs text-muted-foreground">
-          چت آی‌دی شما در باه
+          چت آی‌دی شما در بله
         </Label>
         <Input
           id="bale-chat-id"
@@ -457,7 +595,7 @@ function BalePaymentSection({
           inputMode="numeric"
         />
         <p className="text-xs text-muted-foreground">
-          چت آی‌دی عددی که ربات باه شما را با آن می‌شناسد.
+          چت آی‌دی عددی که ربات بله شما را با آن می‌شناسد.
         </p>
       </div>
 
@@ -467,7 +605,7 @@ function BalePaymentSection({
         className="gap-2"
       >
         {create.isPending ? <Loader2Icon className="size-4 animate-spin" /> : <WalletIcon className="size-4" />}
-        ایجاد فاکتور باه
+        ایجاد فاکتور بله
       </Button>
 
       {invoiceUrl && (
@@ -475,10 +613,10 @@ function BalePaymentSection({
           <CheckCircle2Icon className="size-4" />
           <AlertTitle>فاکتور ایجاد شد</AlertTitle>
           <AlertDescription className="flex flex-col gap-2 text-xs">
-            <span>برای پرداخت، روی دکمهٔ زیر بزنید تا وارد ربات باه شوید.</span>
+            <span>برای پرداخت، روی دکمهٔ زیر بزنید تا وارد ربات بله شوید.</span>
             <a href={invoiceUrl} target="_blank" rel="noopener noreferrer" className="inline-flex w-fit items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs text-primary-foreground">
               <ExternalLinkIcon className="size-3.5" />
-              باز کردن فاکتور باه
+              باز کردن فاکتور بله
             </a>
           </AlertDescription>
         </Alert>
@@ -514,7 +652,7 @@ function MethodCard({
         <span className="text-xs text-muted-foreground">
           {method === "card" && "واریز به کارت مقصد و بارگذاری فیش"}
           {method === "bank" && "پرداخت آنلاین از طریق درگاه بانکی"}
-          {method === "bale" && "پرداخت از کیف پول باه (ربات)"}
+          {method === "bale" && "پرداخت از کیف پول بله (ربات)"}
         </span>
       </div>
     </label>
@@ -696,7 +834,7 @@ export default function PaymentView({ navigate, planId }: PaymentViewProps) {
 
                   <Separator />
 
-                  {method === "card" && <CardToCardSection orderId={orderId} navigate={navigate} />}
+                  {method === "card" && <CardToCardSection orderId={orderId} amount={effectiveAmount} navigate={navigate} />}
                   {method === "bank" && <BankGatewaySection orderId={orderId} />}
                   {method === "bale" && <BalePaymentSection orderId={orderId} />}
                 </>

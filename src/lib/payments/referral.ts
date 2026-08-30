@@ -22,18 +22,32 @@ function rewardCapRials(): number {
   return Number.isFinite(v) && v >= 0 ? v : DEFAULT_REWARD_CAP_RIALS;
 }
 
+export interface ReferralReferredItem {
+  maskedEmail: string;
+  maskedMobile: string;
+  /** Referred user's full name (firstName + " " + lastName) — empty string if absent. */
+  fullName: string;
+  /** Referred user's account status: "active" | "suspended" | … */
+  status: string;
+  /** Referral reward status if a paid reward exists; null when no reward has been paid yet. */
+  rewardStatus: string | null;
+  amountRials: number;
+  amountFa: string;
+  /** When the referred user signed up (ISO). */
+  createdAt: string;
+  /** When the reward was paid (ISO), if any. */
+  rewardCreatedAt: string | null;
+}
+
 export interface ReferralStats {
   referralCode: string;
+  /** Count of Users where referredById === currentUser.id (regardless of reward status). */
+  referredCount: number;
+  /** Backward-compat alias: count of PAID referral rewards for the current user. */
   totalReferrals: number;
   totalRewardRials: number;
   totalRewardFa: string;
-  referred: Array<{
-    maskedEmail: string;
-    maskedMobile: string;
-    amountRials: number;
-    amountFa: string;
-    createdAt: string;
-  }>;
+  referred: ReferralReferredItem[];
 }
 
 function maskEmail(email: string): string {
@@ -50,32 +64,55 @@ export async function getMyReferralStats(userId: string): Promise<ReferralStats>
     select: { referralCode: true },
   });
   if (!user) throw new Error("کاربر یافت نشد.");
+
+  // ----- All referral rewards paid to this user (referrer) -----
   const rewards = await db.referralReward.findMany({
     where: { referrerId: userId, status: "paid" },
     orderBy: { createdAt: "desc" },
   });
-  const referredIds = rewards.map((r) => r.referredId);
-  const referredUsers = referredIds.length
+  const rewardByReferredId = new Map(rewards.map((r) => [r.referredId, r]));
+  let totalReward = 0;
+  for (const r of rewards) totalReward += r.amountRials;
+
+  // ----- Referred users (User where referredById === userId) -----
+  // Counted regardless of reward status. Listed recent-first (max 50).
+  const referredCount = await db.user.count({ where: { referredById: userId } });
+  const referredUsers = referredCount > 0
     ? await db.user.findMany({
-        where: { id: { in: referredIds } },
-        select: { id: true, email: true, mobile: true, createdAt: true },
+        where: { referredById: userId },
+        orderBy: { createdAt: "desc" },
+        take: 50,
+        select: {
+          id: true,
+          email: true,
+          mobile: true,
+          firstName: true,
+          lastName: true,
+          status: true,
+          createdAt: true,
+        },
       })
     : [];
-  const userMap = new Map(referredUsers.map((u) => [u.id, u]));
-  let totalReward = 0;
-  const items = rewards.map((r) => {
-    totalReward += r.amountRials;
-    const ref = userMap.get(r.referredId);
+
+  const items: ReferralReferredItem[] = referredUsers.map((u) => {
+    const reward = rewardByReferredId.get(u.id);
+    const fullName = [u.firstName, u.lastName].filter(Boolean).join(" ").trim();
     return {
-      maskedEmail: maskEmail(ref?.email ?? ""),
-      maskedMobile: maskMobile(ref?.mobile ?? ""),
-      amountRials: r.amountRials,
-      amountFa: formatRials(r.amountRials),
-      createdAt: r.createdAt.toISOString(),
+      maskedEmail: maskEmail(u.email ?? ""),
+      maskedMobile: maskMobile(u.mobile ?? ""),
+      fullName,
+      status: u.status,
+      rewardStatus: reward?.status ?? null,
+      amountRials: reward?.amountRials ?? 0,
+      amountFa: formatRials(reward?.amountRials ?? 0),
+      createdAt: u.createdAt.toISOString(),
+      rewardCreatedAt: reward?.createdAt.toISOString() ?? null,
     };
   });
+
   return {
     referralCode: user.referralCode,
+    referredCount,
     totalReferrals: rewards.length,
     totalRewardRials: totalReward,
     totalRewardFa: formatRials(totalReward),

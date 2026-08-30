@@ -30,7 +30,7 @@ import { formatJalaliDateTime, formatRelative, toPersianDigits } from "@/lib/per
 
 const PROVIDER_FA: Record<string, string> = {
   telegram: "تلگرام",
-  bale: "باله",
+  bale: "بله",
   rubika: "روبیکا",
 };
 

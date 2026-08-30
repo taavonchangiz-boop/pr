@@ -10,19 +10,21 @@ import { Auth } from "@/components/postyar/auth/auth";
 import { Dashboard } from "@/components/postyar/dashboard/dashboard";
 import { Toaster } from "@/components/ui/toaster";
 
+// NOTE: `training` is NOT a public route — it is reachable from inside the
+// authenticated dashboard via `#/dashboard/training` (the dashboard's
+// renderView switch owns the actual <Training> rendering). The public routes
+// exposed here are limited to: landing, rules (and auth).
 type Route =
   | "landing"
   | "auth"
   | "dashboard"
-  | "rules"
-  | "training";
+  | "rules";
 
 function parseHash(): { route: Route; view?: string; param?: string } {
   const h = window.location.hash.replace(/^#\/?/, "");
   const [route, view, param] = h.split("/");
   // PUBLIC routes — accessible logged-in OR logged-out
   if (route === "rules") return { route: "rules" };
-  if (route === "training") return { route: "training" };
   if (!route || route === "landing" || route === "" ) return { route: "landing" };
   if (route === "auth" || route === "login" || route === "register") return { route: "auth" };
   if (route === "dashboard") return { route: "dashboard", view: view ?? "home", param };
@@ -71,8 +73,9 @@ export function PostyarApp() {
   }
 
   // PUBLIC routes — rendered BEFORE the auth gate so logged-out users can view them.
+  // NOTE: training is intentionally NOT public — authenticated users access it
+  // via /dashboard/training, which is handled by the Dashboard component itself.
   if (route === "rules") return <Rules navigate={navigate} />;
-  if (route === "training") return <Training navigate={navigate} />;
 
   if (!user) {
     if (route === "auth") return <Auth navigate={navigate} />;

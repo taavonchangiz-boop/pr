@@ -212,7 +212,7 @@ export function Auth({ navigate }: AuthProps) {
 
                 {otpStep === "complete" && (
                   <form onSubmit={completeRegister} className="space-y-3 pt-2">
-                    <p className="text-xs text-muted-foreground">برای تکمیل ثبت‌نام، اطلاعات زیر را وارد کنید.</p>
+                    <p className="text-center text-xs text-muted-foreground">برای تکمیل ثبت‌نام، اطلاعات زیر را وارد کنید.</p>
                     <Field label="نام" name="firstName" required />
                     <Field label="نام خانوادگی" name="lastName" required />
                     <Field label="ایمیل" name="email" type="email" required dir="ltr" />
@@ -228,7 +228,7 @@ export function Auth({ navigate }: AuthProps) {
               {/* Full register */}
               <TabsContent value="register">
                 <form onSubmit={handleRegister} className="space-y-3 pt-2">
-                  <p className="text-xs text-muted-foreground">هر هفت فیلد زیر ضروری هستند.</p>
+                  <p className="text-center text-xs text-muted-foreground">هر هفت فیلد زیر ضروری هستند.</p>
                   <Field label="نام" name="firstName" required />
                   <Field label="نام خانوادگی" name="lastName" required />
                   <Field label="ایمیل" name="email" type="email" required dir="ltr" />

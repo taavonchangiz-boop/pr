@@ -61,7 +61,13 @@ function BalanceCard({
         </CardTitle>
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
-        <Button onClick={() => navigate("/dashboard/plans")} className="gap-2">
+        <Button
+          onClick={() => {
+            toast.success("برای شارژ کیف پول، یک پلن یا بستهٔ اعتباری انتخاب کنید.");
+            navigate("/dashboard/plans");
+          }}
+          className="gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
           <PlusIcon className="size-4" />
           شارژ کیف پول
         </Button>
@@ -69,12 +75,16 @@ function BalanceCard({
           variant="secondary"
           disabled={balance <= 0}
           onClick={() => navigate("/dashboard/plans")}
-          className="gap-2"
+          className="gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <ArrowUpRightIcon className="size-4" />
           انتقال به اشتراک
         </Button>
-        <Button variant="outline" onClick={() => navigate("/dashboard/ledger")} className="gap-2">
+        <Button
+          variant="outline"
+          onClick={() => navigate("/dashboard/ledger")}
+          className="gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
           <ArrowDownLeftIcon className="size-4" />
           دفتر کل
         </Button>

@@ -1,30 +1,180 @@
-// POSTYAR — /api/admin/settings (GET + POST SystemSetting rows)
-// Admin only. Keys are validated against a whitelist of allowed keys.
+// POSTYAR — /api/admin/settings (GET + POST + PATCH + DELETE SystemSetting rows)
+// Admin only. Keys are validated against an allow-list.
+//
+// ITEM 39/40 — the allow-list is grouped (general / sms_panel /
+// email_panel / bank_gateway / gold_config / ai_config / security).
+// Each group is exposed to the UI as a Card. Keys are env-var-named
+// (POSTYAR_SMS_PROVIDER, POSTYAR_SMTP_HOST, ...) so the provider libs
+// (`getSetting` in src/lib/providers/util.ts) can transparently override
+// `process.env` from SystemSetting rows without code changes.
+//
+// POST  { key, value }                  — single upsert (legacy, kept for
+//                                         backward compat with the previous
+//                                         admin UI which used this shape).
+// PATCH { items: [{key, value}, ...] } — batch upsert (used by the new
+//                                         grouped UI's per-card save).
+// PATCH { key, value }                 — single upsert (alternative shape;
+//                                         the new UI uses the batch form).
+// DELETE { key }                        — delete the row (revert to env /
+//                                         built-in default).
+//
+// After every mutation we call `invalidateSettingsCache()` so the SMS /
+// Email / AI provider libs pick up the change on the next call.
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRole, clientIp, audit, AuthError } from "@/lib/server/auth";
 import { db } from "@/lib/db";
 import { formatJalaliDateTime } from "@/lib/persian";
+import { invalidateSettingsCache } from "@/lib/providers/util";
 
-const ALLOWED_KEYS = [
-  "site.nameFa",
-  "site.supportEmail",
-  "site.supportMobile",
-  "site.termsUrl",
-  "site.privacyUrl",
-  "ai.defaultProvider",
-  "ai.defaultModel",
-  "gold.defaultInstrument",
-  "sms.enabled",
-  "email.enabled",
-  "signup.enabled",
-  "maintenance.messageFa",
+// ---------------------------------------------------------------------
+// Allow-list — grouped. Each key appears in exactly one group. The
+// `id` is what the UI uses to render the Card; `titleFa` /
+// `descriptionFa` are the Persian labels; `keys` is the list of
+// SystemSetting keys that belong to the group, each with its own
+// Persian label + description (consumed by the UI).
+// ---------------------------------------------------------------------
+interface SettingDef {
+  key: string;
+  labelFa: string;
+  descFa: string;
+  sensitive?: boolean;
+  /** Optional preset options to render as a Select instead of free text. */
+  options?: { value: string; labelFa: string }[];
+  /** Default value shown as the placeholder / used by "reset". */
+  default?: string;
+}
+interface SettingGroup {
+  id: "general" | "sms_panel" | "email_panel" | "bank_gateway" | "gold_config" | "ai_config" | "security";
+  titleFa: string;
+  descriptionFa: string;
+  keys: SettingDef[];
+}
+
+const GROUPS: SettingGroup[] = [
+  {
+    id: "general",
+    titleFa: "تنظیمات عمومی",
+    descriptionFa: "نام سامانه، اطلاعات تماس و قواعد کلی پلتفرم.",
+    keys: [
+      { key: "site.nameFa", labelFa: "نام فارسی سامانه", descFa: "نمایشی در سربرگ و قدم‌ها. مثال: «پُست‌یار».", default: "پُست‌یار" },
+      { key: "site.defaultLocale", labelFa: "زبان پیش‌فرض", descFa: "زبان پیش‌فرض سامانه (fa یا en).", default: "fa", options: [{ value: "fa", labelFa: "فارسی" }, { value: "en", labelFa: "انگلیسی" }] },
+      { key: "site.supportEmail", labelFa: "ایمیل پشتیبانی", descFa: "آدرس ایمیل رسمی پشتیبانی برای نمایش در فوتر و تیکت‌ها." },
+      { key: "site.supportMobile", labelFa: "موبایل پشتیبانی", descFa: "شماره موبایل پشتیبانی برای نمایش در فوتر.", sensitive: true },
+      { key: "site.termsUrl", labelFa: "نشانی قوانین", descFa: "نشانی صفحه قوانین و مقررات." },
+      { key: "site.privacyUrl", labelFa: "نشانی حریم خصوصی", descFa: "نشانی صفحه سیاست حریم خصوصی." },
+      { key: "signup.enabled", labelFa: "فعال بودن ثبت‌نام", descFa: "اگر خاموش باشد، ثبت‌نام کاربر جدید غیرفعال می‌شود.", default: "true", options: [{ value: "true", labelFa: "فعال" }, { value: "false", labelFa: "غیرفعال" }] },
+      { key: "maintenance.messageFa", labelFa: "پیام نگهداری", descFa: "در صورت فعال بودن حالت نگهداری، این پیام به کاربران نمایش داده می‌شود." },
+    ],
+  },
+  {
+    id: "sms_panel",
+    titleFa: "پنل پیامکی",
+    descriptionFa: "ارائه‌دهنده، فرستنده، کلید API و الگوی پیامک. مقادیر واردشده، تنظیمات محیطی (env) را بازنویسی می‌کنند.",
+    keys: [
+      {
+        key: "POSTYAR_SMS_PROVIDER",
+        labelFa: "ارائه‌دهنده پیامک",
+        descFa: "کدام سرویس پیامکی برای ارسال OTP استفاده شود.",
+        options: [
+          { value: "", labelFa: "— غیرفعال —" },
+          { value: "kavenegar", labelFa: "کاوه‌نگار" },
+          { value: "smsir", labelFa: "SMS.ir" },
+          { value: "farapayamak", labelFa: "فراپیامک" },
+        ],
+      },
+      { key: "POSTYAR_SMS_SENDER", labelFa: "شماره فرستنده", descFa: "شماره/خط فرستنده پیامک (برای ارائه‌دهنده‌هایی که نیاز دارند)." },
+      { key: "POSTYAR_SMS_API_KEY", labelFa: "کلید API پیامک", descFa: "کلید احراز هویت ارائه‌دهنده پیامک. محرمانه است و در فهرست به‌صورت ماسک نمایش داده می‌شود.", sensitive: true },
+      { key: "POSTYAR_SMS_TEMPLATE_ID", labelFa: "شناسه الگو (SMS.ir)", descFa: "شناسه الگوی پیامک در SMS.ir. برای ارائه‌دهنده‌های دیگر الزامی نیست." },
+      { key: "POSTYAR_SMS_USERNAME", labelFa: "نام کاربری پیامک", descFa: "نام کاربری برای ارائه‌دهنده‌هایی که با نام کاربری/رمز احراز می‌شوند (مثل فراپیامک).", sensitive: true },
+      { key: "POSTYAR_SMS_PASSWORD", labelFa: "رمز عبور پیامک", descFa: "رمز عبور پنل پیامک. محرمانه است.", sensitive: true },
+    ],
+  },
+  {
+    id: "email_panel",
+    titleFa: "پنل ایمیل",
+    descriptionFa: "تنظیمات SMTP برای ایمیل‌های سیستمی. مقادیر واردشده، env را بازنویسی می‌کنند.",
+    keys: [
+      { key: "POSTYAR_SMTP_HOST", labelFa: "میزبان SMTP", descFa: "نشانی میزبان SMTP (مثال: smtp.example.com)." },
+      { key: "POSTYAR_SMTP_PORT", labelFa: "پورت SMTP", descFa: "پورت SMTP (معمولاً 587 برای STARTTLS یا 465 برای SSL).", default: "587" },
+      { key: "POSTYAR_SMTP_USER", labelFa: "نام کاربری SMTP", descFa: "نام کاربری حساب SMTP.", sensitive: true },
+      { key: "POSTYAR_SMTP_PASSWORD", labelFa: "رمز عبور SMTP", descFa: "رمز عبور حساب SMTP. محرمانه است.", sensitive: true },
+      { key: "POSTYAR_SMTP_SENDER_EMAIL", labelFa: "ایمیل فرستنده", descFa: "نشانی ایمیل فرستنده (مثال: no-reply@postyar.local)." },
+      { key: "POSTYAR_SMTP_SENDER_NAME", labelFa: "نام فرستنده", descFa: "نام نمایشی فرستنده (مثال: پُست‌یار).", default: "پُست‌یار" },
+    ],
+  },
+  {
+    id: "bank_gateway",
+    titleFa: "درگاه بانکی",
+    descriptionFa: "پیکربندی درگاه پرداخت بانکی. مقادیر واردشده، env را بازنویسی می‌کنند.",
+    keys: [
+      { key: "POSTYAR_BANK_GATEWAY_NAME", labelFa: "نام درگاه", descFa: "نام نمایشی درگاه (مثال: ملت)." },
+      { key: "POSTYAR_BANK_DIRECT_URL", labelFa: "نشانی توکن", descFa: "نشانی endpoint درخواست توکن درگاه مستقیم (مثال: https://bank.example.com/pg/Token)." },
+      { key: "POSTYAR_BANK_DIRECT_MERCHANT", labelFa: "کد پذیرنده", descFa: "کد پذیرنده (MerchantId) درگاه مستقیم.", sensitive: true },
+      { key: "POSTYAR_BANK_DIRECT_TERMINAL", labelFa: "کد ترمینال", descFa: "کد ترمینال (TerminalId) درگاه مستقیم.", sensitive: true },
+      { key: "POSTYAR_BANK_DIRECT_SECRET", labelFa: "رمز درگاه", descFa: "رمز امضای درگاه مستقیم. محرمانه است.", sensitive: true },
+      { key: "POSTYAR_BANK_INTERMEDIARY_URL", labelFa: "نشانی درگاه واسط", descFa: "نشانی endpoint درگاه واسط (اختیاری).", sensitive: true },
+      { key: "POSTYAR_BANK_INTERMEDIARY_MERCHANT", labelFa: "کد پذیرنده واسط", descFa: "کد پذیرنده (MerchantCode) درگاه واسط.", sensitive: true },
+      { key: "POSTYAR_BANK_INTERMEDIARY_SECRET", labelFa: "رمز درگاه واسط", descFa: "رمز درگاه واسط. محرمانه است.", sensitive: true },
+      { key: "POSTYAR_BANK_CALLBACK_PATH", labelFa: "مسیر بازگشت", descFa: "مسیر callback درگاه. پیش‌فرض: /api/payments/bank/callback.", default: "/api/payments/bank/callback" },
+      { key: "POSTYAR_PUBLIC_BASE_URL", labelFa: "نشانی پایه عمومی", descFa: "نشانی base عمومی سامانه (برای ساخت URL بازگشت مطلق).", sensitive: true },
+    ],
+  },
+  {
+    id: "gold_config",
+    titleFa: "پیکربندی طلا",
+    descriptionFa: "منبع داده قیمت طلا. برای پیکربندی کامل (انتخاب منبع / انتخابگرها / توکن)، به بخش «طلای سامانه» بروید.",
+    keys: [
+      { key: "POSTYAR_GOLD_PROVIDER_URL", labelFa: "نشانی ارائه‌دهنده طلا", descFa: "نشانی JSON ارائه‌دهنده قیمت طلا. پیشنهاد می‌شود از بخش «طلای سامانه» پیکربندی کامل بسازید.", sensitive: true },
+    ],
+  },
+  {
+    id: "ai_config",
+    titleFa: "پیکربندی هوش مصنوعی",
+    descriptionFa: "ارائه‌دهنده و مدل هوش مصنوعی پیش‌فرض. مقادیر واردشده، env را بازنویسی می‌کنند.",
+    keys: [
+      {
+        key: "POSTYAR_AI_PROVIDER",
+        labelFa: "ارائه‌دهنده هوش مصنوعی",
+        descFa: "کدام ارائه‌دهنده به‌صورت پیش‌فرض فراخوانی شود. ارائه‌دهندهٔ داخلی postyar-zai همیشه فعال است.",
+        options: [
+          { value: "", labelFa: "— پیش‌فرض داخلی (postyar-zai) —" },
+          { value: "openai", labelFa: "OpenAI" },
+          { value: "gemini", labelFa: "Google Gemini" },
+          { value: "deepseek", labelFa: "DeepSeek" },
+          { value: "anthropic", labelFa: "Anthropic" },
+          { value: "grok", labelFa: "Grok" },
+          { value: "openrouter", labelFa: "OpenRouter" },
+        ],
+      },
+      { key: "POSTYAR_AI_API_KEY", labelFa: "کلید API هوش مصنوعی", descFa: "کلید احراز هویت ارائه‌دهنده. محرمانه است.", sensitive: true },
+      { key: "POSTYAR_AI_MODEL", labelFa: "مدل هوش مصنوعی", descFa: "شناسه مدل پیش‌فرض (مثال: gpt-4o-mini)." },
+    ],
+  },
+  {
+    id: "security",
+    titleFa: "امنیت و محدودیت",
+    descriptionFa: "تنظیمات امنیتی و محدودیت نرخ. محتاطانه ویرایش کنید.",
+    keys: [
+      { key: "POSTYAR_OTP_COOLDOWN_SEC", labelFa: "فاصلهٔ زمانی OTP (ثانیه)", descFa: "حداقل فاصلهٔ زمانی بین دو درخواست OTP برای یک شماره. پیش‌فرض: ۶۰.", default: "60" },
+      { key: "POSTYAR_MAX_LOGIN_ATTEMPTS", labelFa: "حداکثر تلاش ورود", descFa: "حداکثر تلاش ناموفق قبل از موقت‌مسدود شدن نشانی IP. پیش‌فرض: ۳۰.", default: "30" },
+      { key: "POSTYAR_RATE_LIMIT_PER_MIN", labelFa: "محدودیت نرخ (در دقیقه)", descFa: "حداکثر درخواست در دقیقه برای هر IP روی مسیرهای عمومی. پیش‌فرض: ۶۰.", default: "60" },
+    ],
+  },
 ];
+
+const ALLOWED_KEYS = GROUPS.flatMap((g) => g.keys.map((k) => k.key));
 
 const PostSchema = z.object({
   key: z.string().min(1).max(80),
   value: z.string().max(8000),
 });
+
+const PatchSchema = z.object({
+  items: z.array(z.object({ key: z.string().min(1).max(80), value: z.string().max(8000) })).min(1).max(64),
+}).or(z.object({ key: z.string().min(1).max(80), value: z.string().max(8000) }));
+
+const DeleteSchema = z.object({ key: z.string().min(1).max(80) });
 
 export async function GET() {
   let user;
@@ -41,6 +191,7 @@ export async function GET() {
       updatedAtFa: formatJalaliDateTime(r.updatedAt, { withTime: true }),
     })),
     allowedKeys: ALLOWED_KEYS,
+    groups: GROUPS,
   });
 }
 
@@ -69,6 +220,7 @@ export async function POST(req: Request) {
     create: { key: parsed.data.key, value: parsed.data.value },
     update: { value: parsed.data.value },
   });
+  invalidateSettingsCache(parsed.data.key);
   await audit({
     userId: user.id,
     actor: "admin",
@@ -76,7 +228,7 @@ export async function POST(req: Request) {
     targetType: "system_setting",
     targetId: updated.key,
     ip,
-    meta: { key: updated.key },
+    meta: { key: updated.key, mode: "single" },
   });
   return NextResponse.json({
     ok: true,
@@ -86,4 +238,87 @@ export async function POST(req: Request) {
       updatedAt: updated.updatedAt.toISOString(),
     },
   });
+}
+
+export async function PATCH(req: Request) {
+  let user;
+  try { user = await requireRole(["admin"]); } catch (e) {
+    return NextResponse.json({ errorFa: (e as AuthError).message }, { status: (e as AuthError).status });
+  }
+  const ip = clientIp(req);
+  let body: unknown;
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ errorFa: "بدنه درخواست نامعتبر است." }, { status: 400 });
+  }
+  const parsed = PatchSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { errorFa: parsed.error.issues[0]?.message ?? "ورودی نامعتبر است." },
+      { status: 400 },
+    );
+  }
+  const items = "items" in parsed.data ? parsed.data.items : [parsed.data];
+  // Validate all keys BEFORE persisting — atomicity (no half-saved batch).
+  const bad = items.find((it) => !ALLOWED_KEYS.includes(it.key));
+  if (bad) {
+    return NextResponse.json({ errorFa: `کلید «${bad.key}» پشتیبانی نمی‌شود.` }, { status: 400 });
+  }
+  // Upsert each row sequentially (Prisma doesn't have batch upsert for a
+  // heterogeneous key set; rows are few — ≤64 — so this is fine).
+  for (const it of items) {
+    await db.systemSetting.upsert({
+      where: { key: it.key },
+      create: { key: it.key, value: it.value },
+      update: { value: it.value },
+    });
+    invalidateSettingsCache(it.key);
+  }
+  await audit({
+    userId: user.id,
+    actor: "admin",
+    action: "system_setting_updated",
+    targetType: "system_setting",
+    targetId: items[0]?.key,
+    ip,
+    meta: { keys: items.map((i) => i.key), mode: "batch", count: items.length },
+  });
+  return NextResponse.json({ ok: true, count: items.length });
+}
+
+export async function DELETE(req: Request) {
+  let user;
+  try { user = await requireRole(["admin"]); } catch (e) {
+    return NextResponse.json({ errorFa: (e as AuthError).message }, { status: (e as AuthError).status });
+  }
+  const ip = clientIp(req);
+  let body: unknown;
+  try { body = await req.json(); } catch {
+    return NextResponse.json({ errorFa: "بدنه درخواست نامعتبر است." }, { status: 400 });
+  }
+  const parsed = DeleteSchema.safeParse(body);
+  if (!parsed.success) {
+    return NextResponse.json(
+      { errorFa: parsed.error.issues[0]?.message ?? "ورودی نامعتبر است." },
+      { status: 400 },
+    );
+  }
+  if (!ALLOWED_KEYS.includes(parsed.data.key)) {
+    return NextResponse.json({ errorFa: "این کلید تنظیمات پشتیبانی نمی‌شود." }, { status: 400 });
+  }
+  try {
+    await db.systemSetting.delete({ where: { key: parsed.data.key } });
+  } catch {
+    // Row doesn't exist — that's the same end-state (revert to env/default).
+  }
+  invalidateSettingsCache(parsed.data.key);
+  await audit({
+    userId: user.id,
+    actor: "admin",
+    action: "system_setting_reset",
+    targetType: "system_setting",
+    targetId: parsed.data.key,
+    ip,
+    meta: { key: parsed.data.key },
+  });
+  return NextResponse.json({ ok: true });
 }

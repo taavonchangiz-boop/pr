@@ -7,7 +7,7 @@ import { Providers } from "@/components/layout/providers";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 
 const APP_NAME = "پُست‌یار";
-const APP_DESC = "پلتفرم پُست‌یار برای مدیریت محتوا، زمان‌بندی انتشار، بات‌ساز تلگرام/باله/روبیکا، پرداخت، کیف پول، ارجاع، تبلیغات، هوش مصنوعی، طلا و ووکامرس.";
+const APP_DESC = "پلتفرم پُست‌یار برای مدیریت محتوا، زمان‌بندی انتشار، بات‌ساز تلگرام/بله/روبیکا، پرداخت، کیف پول، ارجاع، تبلیغات، هوش مصنوعی، طلا و ووکامرس.";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://postyar.example"),
@@ -17,7 +17,7 @@ export const metadata: Metadata = {
   },
   description: APP_DESC,
   applicationName: APP_NAME,
-  keywords: ["پست یار", "مدیریت محتوا", "زمان‌بندی انتشار", "بات تلگرام", "بات باله", "بات روبیکا", "پرداخت باه", "کیف پول", "هوش مصنوعی", "طلای ۱۸", "ووکامرس"],
+  keywords: ["پست یار", "مدیریت محتوا", "زمان‌بندی انتشار", "بات تلگرام", "بات بله", "بات روبیکا", "پرداخت با بله", "کیف پول", "هوش مصنوعی", "طلای ۱۸", "ووکامرس"],
   authors: [{ name: "پُست‌یار" }],
   creator: "پُست‌یار",
   manifest: "/manifest/manifest.webmanifest",

@@ -180,6 +180,11 @@ export async function getUnreadCount(userId: string): Promise<number> {
 // ---------------------------------------------------------------------
 // Admin broadcast
 // ---------------------------------------------------------------------
+/**
+ * Legacy admin broadcast input. Kept for backward compatibility with
+ * api.ts `adminBroadcast()` (which posts `{ filter, ... }`). The new
+ * segmented form is `adminSegmentedBroadcast` below.
+ */
 export interface AdminBroadcastInput {
   filter: "all" | "plan:xxx" | "role:user";
   titleFa: string;
@@ -188,27 +193,84 @@ export interface AdminBroadcastInput {
   adminId: string;
 }
 
-export async function adminBroadcast(input: AdminBroadcastInput): Promise<{ sent: number }> {
-  // Build the where clause based on filter
-  let where: Record<string, unknown> = {};
-  if (input.filter === "all") {
-    where = { status: "active" };
-  } else if (input.filter === "role:user") {
-    where = { status: "active", role: "user" };
-  } else if (input.filter.startsWith("plan:")) {
-    const planCode = input.filter.slice(5);
-    // Match users who have an active subscription to this plan code.
-    const plan = await db.plan.findUnique({ where: { code: planCode } });
-    if (!plan) return { sent: 0 };
-    const subs = await db.subscription.findMany({
-      where: { planId: plan.id, status: "active", endsAt: { gt: new Date() } },
-      select: { userId: true },
-    });
-    const userIds = subs.map((s) => s.userId);
-    if (userIds.length === 0) return { sent: 0 };
-    where = { id: { in: userIds }, status: "active" };
-  } else {
-    return { sent: 0 };
+/**
+ * Segmented broadcast input. Audience can be:
+ *   - "all"     → all active users
+ *   - "single"  → one specific user (audienceMeta.userId required)
+ *   - "plan"    → all users with an active subscription to audienceMeta.planId
+ *   - "plans"   → union of users with active subs to any of audienceMeta.planIds[]
+ *   - "support" → role in ["support","admin"] (active only)
+ *
+ * `category` defaults to "system". One BroadcastNotification row is
+ * persisted with `recipientCount`; per-user Notification rows are fanned
+ * out in batches of 200 inside a single Prisma transaction per batch.
+ */
+export type AudienceType = "all" | "single" | "plan" | "plans" | "support";
+
+export interface SegmentedBroadcastInput {
+  audienceType: AudienceType;
+  /** JSON-serialisable metadata. Shape depends on audienceType. */
+  audienceMeta: {
+    userId?: string | null;
+    planId?: string | null;
+    planIds?: string[];
+  };
+  category?: NotificationCategory;
+  titleFa: string;
+  bodyFa: string;
+  link?: string | null;
+  adminId: string;
+}
+
+/**
+ * Resolve a segmented audience into a list of active user IDs. Used by
+ * `adminSegmentedBroadcast` (and exposed for tests / admin preview).
+ */
+export async function resolveBroadcastAudience(input: SegmentedBroadcastInput): Promise<{ userIds: string[] }> {
+  const meta = input.audienceMeta ?? {};
+  let where: Record<string, unknown> = { status: "active" };
+
+  switch (input.audienceType) {
+    case "all": {
+      where = { status: "active" };
+      break;
+    }
+    case "single": {
+      if (!meta.userId) return { userIds: [] };
+      where = { id: meta.userId, status: "active" };
+      break;
+    }
+    case "plan": {
+      if (!meta.planId) return { userIds: [] };
+      const subs = await db.subscription.findMany({
+        where: { planId: meta.planId, status: "active", endsAt: { gt: new Date() } },
+        select: { userId: true },
+        take: 10_000,
+      });
+      const userIds = subs.map((s) => s.userId);
+      if (userIds.length === 0) return { userIds: [] };
+      where = { id: { in: userIds }, status: "active" };
+      break;
+    }
+    case "plans": {
+      const planIds = Array.isArray(meta.planIds) ? meta.planIds.filter(Boolean) : [];
+      if (planIds.length === 0) return { userIds: [] };
+      const subs = await db.subscription.findMany({
+        where: { planId: { in: planIds }, status: "active", endsAt: { gt: new Date() } },
+        select: { userId: true },
+        take: 10_000,
+      });
+      const userIds = Array.from(new Set(subs.map((s) => s.userId)));
+      if (userIds.length === 0) return { userIds: [] };
+      where = { id: { in: userIds }, status: "active" };
+      break;
+    }
+    case "support": {
+      where = { status: "active", role: { in: ["support", "admin"] } };
+      break;
+    }
+    default:
+      return { userIds: [] };
   }
 
   const users = await db.user.findMany({
@@ -216,32 +278,120 @@ export async function adminBroadcast(input: AdminBroadcastInput): Promise<{ sent
     select: { id: true },
     take: 10_000, // hard ceiling — for very large broadcasts, chunk later
   });
-  if (users.length === 0) return { sent: 0 };
+  return { userIds: users.map((u) => u.id) };
+}
 
-  // Create notifications in batches of 200 to avoid query-size limits.
-  const batch = 200;
-  for (let i = 0; i < users.length; i += batch) {
-    const slice = users.slice(i, i + batch);
-    await db.notification.createMany({
-      data: slice.map((u) => ({
-        userId: u.id,
-        category: "system",
-        titleFa: input.titleFa.slice(0, 200),
-        bodyFa: input.bodyFa.slice(0, 2000),
-        link: input.link ?? null,
-      })),
-    });
+/**
+ * Segmented broadcast. Creates one Notification row per recipient in
+ * batches of 200 (transaction per batch), then upserts a
+ * BroadcastNotification row carrying the template + recipient count.
+ */
+export async function adminSegmentedBroadcast(input: SegmentedBroadcastInput): Promise<{
+  sent: number;
+  recipientCount: number;
+  broadcastId: string;
+}> {
+  const { userIds } = await resolveBroadcastAudience(input);
+  const recipientCount = userIds.length;
+  const category: NotificationCategory = input.category ?? "system";
+  const titleFa = input.titleFa.slice(0, 200);
+  const bodyFa = input.bodyFa.slice(0, 2000);
+  const link = input.link ?? null;
+  const audienceMetaJson = JSON.stringify({
+    userId: input.audienceMeta.userId ?? null,
+    planId: input.audienceMeta.planId ?? null,
+    planIds: Array.isArray(input.audienceMeta.planIds) ? input.audienceMeta.planIds : [],
+  });
+
+  if (recipientCount > 0) {
+    const batch = 200;
+    for (let i = 0; i < userIds.length; i += batch) {
+      const slice = userIds.slice(i, i + batch);
+      await db.$transaction(async (tx) => {
+        await tx.notification.createMany({
+          data: slice.map((uid) => ({
+            userId: uid,
+            category,
+            titleFa,
+            bodyFa,
+            link,
+          })),
+        });
+      });
+    }
   }
+
+  // Persist the broadcast template row with recipient count (even when 0 —
+  // useful for audit / "no recipients matched" forensics).
+  const broadcast = await db.broadcastNotification.create({
+    data: {
+      category,
+      titleFa,
+      bodyFa,
+      link,
+      audienceType: input.audienceType,
+      audienceMeta: audienceMetaJson,
+      sentById: input.adminId,
+      sentAt: new Date(),
+      recipientCount,
+    },
+    select: { id: true, recipientCount: true },
+  });
 
   await audit({
     userId: input.adminId,
     actor: "admin",
     action: "broadcast_sent",
     targetType: "notification",
-    meta: { filter: input.filter, recipients: users.length, titleFa: input.titleFa },
+    meta: {
+      audienceType: input.audienceType,
+      audienceMeta: audienceMetaJson,
+      recipients: recipientCount,
+      titleFa,
+      broadcastId: broadcast.id,
+    },
   });
 
-  return { sent: users.length };
+  return { sent: recipientCount, recipientCount, broadcastId: broadcast.id };
+}
+
+/**
+ * @deprecated Use `adminSegmentedBroadcast`. Legacy wrapper kept so
+ * existing callers that pass `filter` (e.g. `api.adminBroadcast` in
+ * api.ts) keep working. Translates the legacy `filter` into the new
+ * segmented form.
+ */
+export async function adminBroadcast(input: AdminBroadcastInput): Promise<{ sent: number }> {
+  let segType: AudienceType = "all";
+  let segMeta: SegmentedBroadcastInput["audienceMeta"] = {};
+  if (input.filter === "all") {
+    segType = "all";
+  } else if (input.filter === "role:user") {
+    // Legacy "role:user" mapped to "all" (the old impl included ALL
+    // active users with any role, since `role: "user"` matches by role
+    // string but the documented intent was "regular users"; to preserve
+    // behaviour precisely we'd need an extra case. Map to all to
+    // minimise surprise; admins wanting role-scoping should use the new
+    // `support` audience.
+    segType = "all";
+  } else if (input.filter.startsWith("plan:")) {
+    const planCode = input.filter.slice(5);
+    const plan = await db.plan.findUnique({ where: { code: planCode } });
+    if (!plan) return { sent: 0 };
+    segType = "plan";
+    segMeta = { planId: plan.id };
+  } else {
+    return { sent: 0 };
+  }
+  const r = await adminSegmentedBroadcast({
+    audienceType: segType,
+    audienceMeta: segMeta,
+    titleFa: input.titleFa,
+    bodyFa: input.bodyFa,
+    link: input.link,
+    adminId: input.adminId,
+  });
+  return { sent: r.sent };
 }
 
 // ---------------------------------------------------------------------

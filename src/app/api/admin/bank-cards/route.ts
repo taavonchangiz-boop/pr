@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { requireRole, clientIp, AuthError } from "@/lib/server/auth";
-import { listBankCards, addBankCard, ALLOWED_BANKS } from "@/lib/payments/bank-cards";
+import { listBankCards, addBankCard, ALLOWED_BANKS, BANKS } from "@/lib/payments/bank-cards";
 
 export async function GET() {
   let user;
@@ -11,7 +11,10 @@ export async function GET() {
   }
   void user;
   const items = await listBankCards();
-  return NextResponse.json({ items, allowedBanks: ALLOWED_BANKS });
+  // `banks` includes color + gradient for the admin UI's beautiful card
+  // preview. `allowedBanks` is kept (string names only) for backward
+  // compatibility with any older client.
+  return NextResponse.json({ items, allowedBanks: ALLOWED_BANKS, banks: BANKS });
 }
 
 const PostSchema = z.object({

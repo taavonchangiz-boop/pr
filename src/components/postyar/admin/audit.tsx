@@ -6,6 +6,11 @@
 // timestamp, meta (collapsible JSON). Filters: actor, action,
 // targetType.
 // =====================================================================
+// NOTE (ITEM 35): این بخش فقط برای مدیر سامانه قابل مشاهده است.
+// The route /api/admin/audit enforces `requireRole(["admin"])` (NOT
+// `["admin","support"]`) — support agents cannot view the audit log.
+// The dashboard renders this view only for admins. See also
+// src/app/api/admin/audit/route.ts.
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import {

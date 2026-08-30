@@ -1,9 +1,14 @@
 // POSTYAR — /api/admin/plans (GET, POST create plan — admin)
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { requireRole, clientIp, audit, AuthError } from "@/lib/server/auth";
+import { requireRole, clientIp, audit, AuthError, safeJsonParse } from "@/lib/server/auth";
 import { db } from "@/lib/db";
 import { formatRials, formatJalaliDate } from "@/lib/persian";
+import {
+  parsePlanFeatures,
+  countEnabledFeatures,
+  type PlanFeatures,
+} from "@/lib/payments/plans";
 
 export async function GET() {
   let user;
@@ -12,25 +17,35 @@ export async function GET() {
   }
   void user;
   const rows = await db.plan.findMany({
-    orderBy: { priceRials: "asc" },
+    orderBy: [{ sortOrder: "asc" }, { priceRials: "asc" }],
     include: { _count: { select: { subscriptions: true } } },
   });
   return NextResponse.json({
-    items: rows.map((p) => ({
-      id: p.id,
-      code: p.code,
-      nameFa: p.nameFa,
-      descriptionFa: p.descriptionFa,
-      priceRials: p.priceRials,
-      priceRialsFa: formatRials(p.priceRials),
-      intervalMonths: p.intervalMonths,
-      quota: JSON.parse(p.quota || "{}"),
-      active: p.active,
-      isPublic: p.isPublic,
-      subscriptionCount: p._count.subscriptions,
-      createdAt: p.createdAt.toISOString(),
-      createdAtFa: formatJalaliDate(p.createdAt),
-    })),
+    items: rows.map((p) => {
+      const features = parsePlanFeatures(p.features);
+      return {
+        id: p.id,
+        code: p.code,
+        nameFa: p.nameFa,
+        descriptionFa: p.descriptionFa,
+        priceRials: p.priceRials,
+        priceRialsFa: formatRials(p.priceRials),
+        intervalMonths: p.intervalMonths,
+        quota: safeJsonParse(p.quota || "{}", {}),
+        features,
+        featureCount: countEnabledFeatures(features),
+        imageUrl: p.imageUrl,
+        discountPct: p.discountPct ?? 0,
+        renewalDiscountPct: p.renewalDiscountPct ?? 0,
+        renewalDiscountWindowDays: p.renewalDiscountWindowDays ?? 0,
+        sortOrder: p.sortOrder ?? 0,
+        active: p.active,
+        isPublic: p.isPublic,
+        subscriptionCount: p._count.subscriptions,
+        createdAt: p.createdAt.toISOString(),
+        createdAtFa: formatJalaliDate(p.createdAt),
+      };
+    }),
   });
 }
 
@@ -41,6 +56,12 @@ const PostSchema = z.object({
   priceRials: z.number().int().nonnegative(),
   intervalMonths: z.number().int().min(1).max(12),
   quota: z.record(z.string(), z.number()).optional(),
+  features: z.record(z.string(), z.union([z.boolean(), z.number()])).optional(),
+  imageUrl: z.string().max(2048).optional(),
+  discountPct: z.number().int().min(0).max(100).optional(),
+  renewalDiscountPct: z.number().int().min(0).max(100).optional(),
+  renewalDiscountWindowDays: z.number().int().min(0).max(365).optional(),
+  sortOrder: z.number().int().optional(),
   active: z.boolean().optional(),
   isPublic: z.boolean().optional(),
 });
@@ -66,6 +87,9 @@ export async function POST(req: Request) {
   if (dup) {
     return NextResponse.json({ errorFa: "این کد طرح قبلاً ثبت شده است." }, { status: 409 });
   }
+  const features: PlanFeatures = parsePlanFeatures(
+    parsed.data.features ? JSON.stringify(parsed.data.features) : "{}",
+  );
   const created = await db.plan.create({
     data: {
       code: parsed.data.code,
@@ -74,6 +98,12 @@ export async function POST(req: Request) {
       priceRials: parsed.data.priceRials,
       intervalMonths: parsed.data.intervalMonths,
       quota: JSON.stringify(parsed.data.quota ?? {}),
+      features: JSON.stringify(features),
+      imageUrl: parsed.data.imageUrl ?? null,
+      discountPct: parsed.data.discountPct ?? 0,
+      renewalDiscountPct: parsed.data.renewalDiscountPct ?? 0,
+      renewalDiscountWindowDays: parsed.data.renewalDiscountWindowDays ?? 0,
+      sortOrder: parsed.data.sortOrder ?? 0,
       active: parsed.data.active ?? true,
       isPublic: parsed.data.isPublic ?? true,
     },
@@ -85,7 +115,12 @@ export async function POST(req: Request) {
     targetType: "plan",
     targetId: created.id,
     ip,
-    meta: { code: parsed.data.code, priceRials: parsed.data.priceRials },
+    meta: {
+      code: parsed.data.code,
+      priceRials: parsed.data.priceRials,
+      discountPct: parsed.data.discountPct ?? 0,
+      featureCount: countEnabledFeatures(features),
+    },
   });
   return NextResponse.json({ ok: true, planId: created.id }, { status: 201 });
 }

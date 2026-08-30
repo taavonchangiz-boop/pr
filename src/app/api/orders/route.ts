@@ -21,7 +21,7 @@ const KIND_FA: Record<string, string> = {
 const PROVIDER_FA: Record<string, string> = {
   card: "کارت به کارت",
   bank: "درگاه بانکی",
-  bale: "پرداخت باه",
+  bale: "پرداخت با بله",
 };
 
 export async function GET(req: Request) {

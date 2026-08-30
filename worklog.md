@@ -1677,3 +1677,1549 @@ Work Log:
 Stage Summary:
 - ALL 13 user requirements implemented & browser-verified: (1) unimplemented items fixed, (2) logo/icons/images/favicon across pages, (3) landing = asovin+botsaaz palette, (4) separate independent login/register popups, (5) first-admin rule, (6) bottom mobile navbar, (7) admin<->user dashboard switch, (8) header date+time 24h Jalali, (9) ui-ux-pro-max-skill applied, (10) stats section in user+admin dashboards, (11) usage counter widget, (12) notification bell in both dashboards, (13) push to repo.
 - Only honest gap: the first-admin rule's "empty-DB -> admin" branch could not be live-demoed without wiping demo data; the code is verified (tsc) and the training page documents it. The non-first branch (registering now -> user) is the live behavior for the existing demo DB.
+
+---
+Task ID: revamp2-foundation
+Agent: main
+Task: Foundation for the 42-item revamp (assets, Bale typo fix, auth form centering, Prisma schema extension).
+
+Work Log:
+- Copied brand assets: upload/asovin.webp → public/brand/asovin.webp; upload/postyar.webp → public/brand/postyar.webp; extracted icons.zip logos → public/brand/{logo,logo-full,logo-full-white-bg,logo-white-bg}.webp; favicon/app icons → public/icons/.
+- Fixed Bale platform misspelling project-wide: «باله» → «بله» (caption-view.tsx, inbox-view.tsx, landing.tsx, rules.tsx, training.tsx, layout.tsx); «پرداخت باه/ربات باه/در باه/فاکتور باه/کیف پول باه» → «با بله» (payment/view.tsx, payment/orders.tsx, payment/plans.tsx, api/orders/route.ts, layout.tsx). Verified clean: no residual «باله»/«باه» outside legitimate substrings.
+- Auth form centering (item 3): landing.tsx LoginDialog + RegisterDialog DialogHeader `text-right` → `text-center`; subtext «برای تکمیل ثبت‌نام…» → `text-center`; auth.tsx standalone subtexts «برای تکمیل…» and «هر هفت فیلد…» → `text-center`.
+- Prisma schema extension (consolidated, so parallel feature agents don't race on the schema file):
+  * Plan: + features (JSON granular flags), imageUrl, discountPct, renewalDiscountPct, renewalDiscountWindowDays, sortOrder.
+  * AdCampaign: + placementRel (FK to AdPlacement.key), +index on placement.
+  * AdPlacement (NEW): admin-defined slots (key, labelFa, kind, active, sortOrder).
+  * Ticket: + departmentId (FK), +index on departmentId/status; priority enum widened to include urgent.
+  * TicketDepartment (NEW): admin CRUD departments (nameFa, priority, active).
+  * TicketReply: + attachments relation.
+  * TicketAttachment (NEW): image/zip attachments (fileName, mime, sizeBytes, storagePath).
+  * BroadcastNotification (NEW): segmented admin broadcasts (audienceType all/single/plan/plans + audienceMeta JSON).
+  * GoldPriceConfig (NEW): token/JSON + free platform selector (source, endpoint, token, selectors, refreshMinutes).
+- Ran `bun run db:push` — DB in sync, Prisma Client regenerated.
+
+Stage Summary:
+- Foundation done. Schema is now stable; feature subagents can touch only their own TSX/API files.
+- Quick wins delivered: items 3 (auth centering), 42 (Bale spelling).
+- Worklog convention: each subsequent agent appends a section after `---` with Task ID / Agent / Task / Work Log / Stage Summary.
+
+---
+Task ID: revamp2-landing
+Agent: frontend-styling-expert
+Task: Hero redesign as a composed "product environment" + brand-image (asovin.webp) accents in landing/rules/training + private routing of the training page (only reachable from inside the authenticated dashboard).
+
+Work Log:
+- Read worklog tail (foundation + previous agents); confirmed `asovin.webp` + `postyar.webp` live at `/public/brand/`; confirmed eslint config disables `no-unused-vars`/`@typescript-eslint/no-unused-vars` so keeping the `Training` import in `postyar-app.tsx` after removing its only public call-site is lint-clean.
+- landing.tsx:
+  * Added imports `RadioIcon, UsersIcon, HeartIcon, ClockIcon` to the existing lucide-react block (no emojis anywhere).
+  * Added a new `PLATFORMS` const (7 entries) — Telegram→SendIcon `#22d3ee`, Bale→MessageCircleIcon `#3b82f6`, Rubika→RadioIcon `#8b5cf6`, Bot→BotIcon `#34d399`, AI→SparklesIcon `#34d399`, WordPress→GlobeIcon `#21759b`, WooCommerce→ShoppingCartIcon `#7f54b3` (lucide has no brand icons; these generic icons are tinted with each platform's official brand color).
+  * Replaced the static `<img src="/landing/hero.png">` with a composed hero visual:
+    - Central dashboard mock = `/brand/postyar.webp` inside a `rounded-2xl border border-white/15 bg-[#0d1322]/80 backdrop-blur p-2.5 shadow-2xl` card; fake browser chrome (rose/amber/emerald dots + `postyar.ir/dashboard` URL pill, dir=ltr).
+    - 3 floating glassmorphic stat cards positioned ABSOLUTELY around the dashboard mock — each `rounded-xl border border-white/10 bg-white/5 backdrop-blur p-2.5 motion-safe:animate-pulse` with staggered `animationDelay`:
+      · top-right: `۲۴+ هزار کاربر فعال` (UsersIcon, emerald) — `hidden sm:flex`.
+      · bottom-left: `۹۴٪ رضایت کاربران` (HeartIcon, amber) — `hidden sm:flex`.
+      · mid-right: `۲۴/۷ پشتیبانی زنده` (ClockIcon, cyan) — `hidden lg:flex` (only on large screens).
+    - Outer glow: `pointer-events-none absolute -inset-6 -z-10 rounded-3xl motion-safe:animate-pulse` cyan radial.
+    - Platform glass badges strip BELOW the dashboard mock: `mt-5 grid grid-cols-3 gap-2 sm:grid-cols-7` — 7 cards `rounded-xl border border-white/10 bg-white/5 p-2.5 backdrop-blur motion-safe:transition-colors hover:border-[#22d3ee]/40`, each with the platform's tinted lucide icon + Persian label.
+    - Numbers use `toPersianDigits(...)`; all animations wrapped in `motion-safe:`.
+  * Inserted a new "ABOUT / BRAND STRIP (asovin.webp accent)" section between FEATURES GRID and BOT BUILDER HIGHLIGHT: `grid-cols-1 md:grid-cols-2` — left side is `<img src="/brand/asovin.webp" className="w-full rounded-2xl border border-white/10 shadow-2xl shadow-[#070b16]">` with an amber glow; right side is ShieldCheckIcon badge + "یک پلتفرم، صد قابلیت" heading + paragraph + 4-item CheckCircle2Icon list (چرخهٔ کامل انتشار محتوا، بات‌ساز با گردش کار واقعی، پرداخت چندگانه و کیف پول شفاف، راست‌چین، جلالی و ارقام فارسی).
+  * Removed `#/training` link from the sticky top-nav (kept `قوانین و مقررات` link + 4 anchor links) and from the footer (kept `قوانین و مقررات` + anchor links). Left an explanatory JSX comment that آموزش is reachable from the authenticated dashboard via `#/dashboard/training`.
+- rules.tsx:
+  * Added `<img src="/brand/asovin.webp" className="mb-8 w-full rounded-2xl border border-white/10 shadow-lg shadow-[#070b16]">` as a header banner at the top of `<main>` (before the centered badge+title block).
+  * Removed the `آموزش` button from the footer nav (it would have linked to a now-non-existent public route).
+- training.tsx:
+  * Added the same `<img src="/brand/asovin.webp">` header banner at the top of `<main>` (before the centered badge+title block).
+  * Confirmed `export default Training;` is already present at EOF (line 248) so the dashboard agent can `import Training, { type TrainingProps }` from `@/components/postyar/landing/training`.
+- postyar-app.tsx (EDIT — additive only, no existing view removed):
+  * Removed `| "training"` from the `Route` type union (now only `"landing" | "auth" | "dashboard" | "rules"`).
+  * Removed `if (route === "training") return { route: "training" };` from `parseHash` (so a hash like `#training` now falls through to the landing default — no longer exposes the Training view publicly).
+  * Removed `if (route === "training") return <Training navigate={navigate} />;` from the public-routes block before the auth gate.
+  * KEPT the `import { Training } from "@/components/postyar/landing/training";` line per task instructions (lint config has `no-unused-vars: "off"`; tsc has no `noUnusedLocals`; verified both passes clean).
+  * Added a leading comment block explaining that training is reachable ONLY from inside the authenticated dashboard via `#/dashboard/training`, and that the Dashboard's `renderView` switch (owned by another agent) is what renders `<Training>` for `view === "training"`.
+
+Stage Summary:
+- 4 files in scope, all edited:
+  * src/components/postyar/landing/landing.tsx — hero redesigned (composed product environment with central postyar.webp dashboard mock + 3 floating stat cards + 7-platform glass badges strip), new "دربارهٔ پُست‌یار" section with asovin.webp accent, #/training nav/footer links removed.
+  * src/components/postyar/landing/rules.tsx — asovin.webp header banner added; آموزش footer link removed.
+  * src/components/postyar/landing/training.tsx — asovin.webp header banner added; default export already present (confirmed).
+  * src/components/postyar/postyar-app.tsx — `#/training` public route case removed (parseHash + render); `| "training"` removed from `Route` type; Training import intentionally kept.
+- Verification:
+  * `cd /home/z/my-project && bun run lint` → EXIT 0 (0 errors, 0 warnings). The whole project is lint-clean.
+  * `cd /home/z/my-project && bunx tsc --noEmit` → EXIT 0 (0 type errors project-wide). Grep for `landing|training|rules|postyar-app` in the tsc output returns ZERO matches — all 4 of my files are type-clean.
+- Brand-image usage confirmed in 3 places: landing.tsx (asovin.webp side-accent in the new ABOUT section), rules.tsx (asovin.webp header banner), training.tsx (asovin.webp header banner). The postyar.webp brand image is featured prominently inside the hero as the central dashboard mock.
+- Training route confirmation: `#/training` is NO LONGER a public route. A logged-out visitor hitting `#training` now falls through to `<Landing>` (the parseHash default). Authenticated users access the training page via `#/dashboard/training` — when an authenticated user navigates there, `postyar-app.tsx` parses `{ route: "dashboard", view: "training" }` and renders `<Dashboard initialView="training" />`; the dashboard agent owns the `case "training": return <Training navigate={navigate} />;` wiring in dashboard.tsx's `renderView` switch (Training is already exported as both named and default from training.tsx).
+- Universal constraints honored: lucide-react icons ONLY (no emojis) ✓; `cursor-pointer` + `focus-visible:ring-2 focus-visible:ring-ring` on every clickable raw element ✓ (existing patterns preserved; new hero elements are non-interactive `aria-hidden` decorations so they don't need click handlers); all text Persian, RTL (`dir="rtl"` on root) ✓; numbers in Persian digits via `toPersianDigits(...)` ✓; dark asovin+botsaaz palette preserved (no indigo/blue introduced) ✓; `prefers-reduced-motion` respected via `motion-safe:` prefixes on every animation ✓; hero responsive — on mobile the visual stacks below the text (existing `lg:grid-cols-2`), and the floating stat cards use `hidden sm:flex` / `hidden lg:flex` to gracefully disappear on small screens, while the platform badges strip collapses from `sm:grid-cols-7` to `grid-cols-3` ✓; footer sticky-to-bottom preserved (existing `min-h-screen flex flex-col` wrapper + `mt-auto` footer untouched) ✓; LoginDialog/RegisterDialog internals untouched ✓; pricing/FAQ/features/CTA content untouched ✓; dev server on port 3000 not touched ✓.
+- No blockers. No out-of-scope issues left in my 4 files.
+
+---
+Task ID: revamp2-tickets
+Agent: Ticket System Upgrade subagent (code-writing agent)
+Task: Items 17 (ticket departments) + 18 (ticket attachments) — admin department CRUD, admin assign/department/priority, user reply composer with image/zip attachments, attachment streaming download. Stay in the existing light teal+gold theme; do NOT touch dashboard.tsx, postyar-app.tsx, prisma/schema.prisma, other agents' files.
+
+Work Log (files touched — all in-scope):
+1. EDITED `src/lib/tickets/index.ts` (additive — no existing export removed/renamed):
+   - Widened `TicketPriority` from `"low" | "normal" | "high"` to `"low" | "normal" | "high" | "urgent"`. Added `urgent: "فوری"` to `PRIORITY_FA`.
+   - Extended `TicketView` with optional `departmentId?: string | null` + `departmentNameFa?: string | null`.
+   - Extended `TicketReplyView` with optional `attachments?: TicketAttachmentView[]`.
+   - Added new interfaces: `TicketAttachmentView` + `TicketDepartmentView`.
+   - Updated `toView` helper to accept optional `departmentId` + `department` and emit `departmentId`/`departmentNameFa`.
+   - Extended `listMyTickets` + `listAllTicketsForAdmin` include clauses to fetch `department: { select: { id: true, nameFa: true } }`. Added optional `departmentId` filter to both.
+   - Extended `getTicket` include clauses: `department` on the ticket + `attachments: true` on each reply. Reply mapper now emits `attachments[]` per reply.
+   - Added new exports:
+     * `listDepartments()` → `{ items: TicketDepartmentView[] }` sorted by priority asc + name asc, with `_count.tickets`.
+     * `createDepartment({ nameFa, descriptionFa?, priority?, active? })` — validates name length 1–60, rejects duplicates, default priority 100, default active true.
+     * `updateDepartment({ id, nameFa?, descriptionFa?, priority?, active? })` — partial update with duplicate-name guard.
+     * `deleteDepartment(id)` — relies on schema onDelete: SetNull to nullify tickets.departmentId.
+     * `assignTicketFields({ ticketId, adminId, departmentId?, assignedToId?, priority?, ip? })` — single call that sets any subset of departmentId/assignedToId/priority; validates department FK, supporter role (support/admin), priority enum; audit-log + notification on supporter assignment.
+     * `validateAttachmentMime(mime, originalName)` + `validateAttachmentSize(mime, sizeBytes)` — shared validators. Allowed: image/jpeg, image/png, image/gif, image/webp, application/zip (+.zip extension fallback). Image ≤ 5 MiB, zip ≤ 10 MiB. Max 8 files per reply (`ATTACHMENT_MAX_FILES`).
+     * `replyTicketWithAttachments({ ticketId, userId, body, isStaff?, attachments?, ip? })` — pre-validates all attachments; ownership check (owner OR staff); creates `TicketReply` then writes files to `${STORAGE_ROOT}/tickets/<ticketId>/<uuid>-<safeBase>.<safeExt>` via `fs.mkdir({ recursive: true })`; creates `TicketAttachment` rows; updates ticket status; audit-logs; notifies the OTHER party. On storage error, deletes the half-written reply + attachments (best-effort cleanup).
+     * `getAttachmentForDownload({ attachmentId, userId, isStaff })` — returns `{ ok, storagePath, mime, fileName, ticketId }` if owner/staff; otherwise `{ ok: false, errorFa }`.
+   - Added private helpers: `ensureTicketStorage(ticketId)`, `toFaNumber(n)`.
+
+2. EDITED `src/components/postyar/api.ts` (additive):
+   - Extended `TicketRow` with optional `departmentId` + `departmentNameFa`.
+   - Extended `AdminTicketRow` with `departmentId: string | null` + `departmentNameFa: string | null`.
+   - Extended `TicketReplyView` with optional `attachments?: TicketAttachmentRow[]`.
+   - Added new types: `TicketAttachmentRow` + `TicketDepartmentRow`.
+   - Extended `getAdminTicketsTyped(params)` to accept `departmentId?: string | null` and forward it as the `departmentId` query param.
+   - Added new client methods:
+     * `adminAssignTicketFields(ticketId, { departmentId?, assignedToId?, priority? })` → POST /api/admin/tickets/[id]/assign.
+     * `getTicketDepartments()` → GET /api/admin/tickets/departments.
+     * `adminCreateDepartment(body)` → POST /api/admin/tickets/departments.
+     * `adminUpdateDepartment(id, body)` → PATCH /api/admin/tickets/departments/[id].
+     * `adminDeleteDepartment(id)` → DELETE /api/admin/tickets/departments/[id].
+     * `replyTicketWithAttachments(ticketId, body, files, opts?)` → POST /api/tickets/[id]/replies as `multipart/form-data` (FormData with `body`, optional `close`, repeated `files`). Throws on `errorFa`.
+     * `getTicketAttachmentUrl(ticketId, attachmentId)` → returns the URL string for `<img src>` or `<a href download>`.
+   - The existing `replyTicket(id, body, opts?)` JSON path and `adminAssignTicket(id, supportUserId)` legacy PATCH path are kept for backward compatibility.
+
+3. EDITED `src/app/api/admin/tickets/route.ts` (additive — GET only; PATCH handler untouched):
+   - Added reading of the `departmentId` query param and forwarding it to `listAllTicketsForAdmin({ departmentId })`. `?departmentId=null` selects tickets with no department; absent param preserves the existing behavior.
+
+4. CREATED `src/app/api/tickets/[id]/replies/route.ts` (~115 lines):
+   - POST handler that parses `multipart/form-data` via `await req.formData()`. Reads `body` (string), optional `close` ("true"), and a repeated `files` File[] via `form.getAll("files")`.
+   - Validates body length 2–8000. Enforces a 60 MiB hard ceiling across all files (`MAX_TOTAL_REPLY_BYTES`) before per-file MIME/size validation.
+   - Converts each File to a Buffer (`Buffer.from(await entry.arrayBuffer())`) and calls `replyTicketWithAttachments`.
+   - If `close=true`, calls `closeTicket` after a successful reply. Returns `{ ok: true, reply }` 201.
+   - Auth: `requireUser()`; isStaff = role admin/support. The lib layer enforces owner-or-staff again.
+
+5. CREATED `src/app/api/tickets/[id]/attachments/[attachmentId]/route.ts` (~85 lines):
+   - GET handler that streams a single attachment file. Auth: `requireUser()` + `getAttachmentForDownload` (lib enforces owner-or-staff).
+   - Defense-in-depth: after fetching storagePath, normalizes the absolute path and rejects anything outside `${STORAGE_ROOT}/tickets/`.
+   - Reads via `readPrivateFile(storagePath)` (the lib already rejects `..` traversal + outside-root paths).
+   - Sends the right `Content-Type` (from the validated `mime`), `Content-Disposition: inline` for images (so `<img>` + click-to-open works) / `attachment` for zip (so it downloads), `Cache-Control: private, no-store`, `X-Content-Type-Options: nosniff`, `X-Frame-Options: DENY`. Filename is RFC-5987-encoded (`filename*=UTF-8''<enc>`) for Persian filenames.
+
+6. CREATED `src/app/api/admin/tickets/departments/route.ts` (~70 lines):
+   - GET list (sorted by priority asc + name asc) — `requireRole(["admin", "support"])` (support can read for filter UI; only admin can write).
+   - POST create `{ nameFa, descriptionFa?, priority?, active? }` — `requireRole(["admin"])`, zod-validated, calls `createDepartment`. Returns `{ ok, department }` 201.
+
+7. CREATED `src/app/api/admin/tickets/departments/[id]/route.ts` (~80 lines):
+   - PATCH partial update `{ nameFa?, descriptionFa?, priority?, active? }` — `requireRole(["admin"])`, zod-validated, calls `updateDepartment`.
+   - DELETE — `requireRole(["admin"])`, calls `deleteDepartment` (schema onDelete: SetNull nullifies tickets.departmentId).
+
+8. CREATED `src/app/api/admin/tickets/[id]/assign/route.ts` (~65 lines):
+   - POST `{ departmentId?, assignedToId?, priority? }` — `requireRole(["admin"])`, zod-validated with a `.refine` requiring at least one field. priority enum widened to include `urgent`. Calls `assignTicketFields`. Returns `{ ok: true }` 200.
+
+9. CREATED `src/components/postyar/admin/ticket-departments.tsx` (~330 lines, "use client"):
+   - Exports `function TicketDepartmentsManager({ embedded }: { embedded?: boolean })` + default.
+   - Lists all departments in a shadcn `<Table>` (sorted by priority asc by the API). Columns: نام، توضیحات، اولویت، تیکت‌ها، وضعیت، عملیات.
+   - «دپارتمان جدید» button + `<Dialog>` form (name, description, priority number, active Switch). Same dialog reused for inline edit (prefilled via `fromRow`).
+   - Delete: `<AlertDialog>` confirm. Toast (sonner) success/error on every mutation. After success, invalidates both `["admin", "ticket-departments"]` and `["admin", "tickets"]` queries.
+   - Loading skeleton + empty state ("هنوز دپارتمانی تعریف نشده است." with a CTA button). Error state ("بارگذاری دپارتمان‌ها ناموفق بود.").
+   - When `embedded=true`, wraps the table in a plain bordered container (so it can be hosted inside a Dialog from `admin/tickets.tsx` without double-card chrome).
+
+10. EDITED `src/components/postyar/admin/tickets.tsx` (additive rewrite, all existing functionality preserved):
+    - Added imports: `LayersIcon` from lucide; `Dialog/DialogContent/DialogDescription/DialogHeader/DialogTitle`; `TicketDepartmentRow` type; `TicketDepartmentsManager` component.
+    - Top bar: added «مدیریت دپارتمان‌ها» outline button (LayersIcon) that opens a Dialog hosting `<TicketDepartmentsManager embedded />`.
+    - CardHeader: added a second `<Select>` for department filter (همهٔ دپارتمان‌ها / بدون دپارتمان / each department name). Status `<Select>` retained. Both reset `page` to 1 on change. The query key includes `departmentId` so react-query refetches.
+    - Added `depQ` (GET /api/admin/tickets/departments) + `adminSupportQ` (admin users) queries so the row-level Selects have data. Combined supporters = `[...supporters, ...adminSupporters]`.
+    - Added per-row `<Select>` for priority (low/normal/high/urgent — calls `adminAssignTicketFields({ priority })`). The cell uses the Select directly so the admin can change priority inline.
+    - Added per-row `<Select>` for department (بدون دپارتمان + each department — calls `adminAssignTicketFields({ departmentId })`).
+    - Replaced the conditional assignedTo cell with a `<Select>` that always shows (بدون پشتیبان + all supporters/admins). For unassigned tickets, falls back to the legacy `adminAssignTicket` PATCH endpoint (preserves existing behavior + toast wording); for reassignment, uses the new `adminAssignTicketFields({ assignedToId })`.
+    - New column «دپارتمان» between «اولویت» and «پشتیبان». Table now has 8 columns (was 7).
+    - All Selects stop propagation on click (`onClick={(e) => e.stopPropagation()}`) so the row's navigate-to-detail handler doesn't fire when changing selects.
+    - New mutation `assignFieldsMut` with a smart success toast ("دپارتمان، پشتیبان به‌روز شد." etc. summarizing which fields changed).
+    - Status filter, pagination (قبلی/بعدی), navigation to detail, AdminGate(["admin", "support"]) wrapper — all preserved.
+
+11. EDITED `src/components/postyar/tickets/detail.tsx` (additive rewrite, all existing functionality preserved):
+    - Added imports: `FileArchiveIcon`, `ImageIcon`, `PaperclipIcon`, `UploadIcon`, `XIcon` from lucide; `Input` from shadcn; `TicketRow`/`TicketReplyView` types; `useMemo`.
+    - Added module-level constants: `MAX_IMAGE_BYTES = 5 MiB`, `MAX_ZIP_BYTES = 10 MiB`, `MAX_FILES_PER_REPLY = 8`, allowed MIME/ext sets.
+    - Added `validateFile(file)` + `fileSizeLabel(bytes)` helpers. Image > 5 MiB → reject; zip > 10 MiB → reject; non-image/zip → reject with Persian toast text.
+    - Reply composer:
+      * Added `<Input id="ticket-file-input" type="file" multiple accept="image/*,.zip,application/zip,application/x-zip-compressed" className="hidden" />` with a `<label htmlFor="ticket-file-input">` styled as a shadcn button (PaperclipIcon + «افزودن فایل» + hint text "(تصویر تا ۵ مگابایت، ZIP تا ۱۰ مگابایت)").
+      * On file selection, validates each file, appends to `pendingFiles: PendingFile[]` (capped at 8). Resets the input value so the same file can be re-added after removal.
+      * Renders the pending-files list (one row per file): image icon or zip icon, filename (dir=ltr), size label, status pill (تأیید شد / Persian error message), remove button (XIcon, calls `onRemoveFile`).
+      * The Send button is disabled when any pending file is invalid OR body < 2 chars OR ticket is closed.
+      * On submit: `replyMut.mutationFn` calls `api.replyTicketWithAttachments(ticketId, reply.trim(), files.filter(p => p.ok), opts)` — FormData POST to /api/tickets/[id]/replies. The legacy JSON reply path is no longer used (the new endpoint is the primary path; the old POST /api/tickets/[id] still exists for any other consumers).
+      * On success: clears reply text + pending files + invalidates detail/list queries + toast.
+    - `ReplyItem` (existing replies):
+      * Each reply now also renders its `attachments[]` if present:
+        - Images → `<a href={api.getTicketAttachmentUrl(...)} target="_blank" rel="noopener noreferrer">` wrapping an `<img className="size-24 cursor-pointer rounded-md border object-cover" loading="lazy">`.
+        - Zip → `<a href={url} download={fileName}>` styled as a download chip (border, FileArchive icon, filename, size, UploadIcon).
+      * Per-attachment URL goes through GET /api/tickets/[id]/attachments/[attachmentId] which streams with the right Content-Type + owner-or-staff auth.
+    - Ticket header Card now shows two extra `<Badge>` elements when present: «اولویت: <priorityFa>» (destructive variant for urgent/high) and «دپارتمان: <departmentNameFa>» (outline variant).
+    - Close dialog (AlertDialog), back button, status badge, loading skeleton, error state with retry via back-to-list — all preserved.
+
+Constraints honored (universal):
+- All Persian text, RTL (`dir="rtl"` on every section root + Dialog/AlertDialog Content).
+- Persian digits via `toPersianDigits(...)` for counts, file sizes, page numbers, priorities, ticket counts, department counts.
+- lucide-react icons ONLY (Ticket, Layers, FileArchive, Image, Paperclip, X, Upload, Send, CheckCircle2, AlertCircle, Loader2, Plus, Pencil, Save, Trash2, ChevronLeft/Right, Switch). Verified all exports exist via node require check.
+- `cursor-pointer` + `focus-visible:ring-2 focus-visible:ring-ring` on all custom clickables (file-input label, pending-file remove buttons, attachment download chips, attachment image links).
+- Loading skeleton + error + empty states on every async section (admin/tickets list, admin/departments list, user ticket detail, reply composer).
+- Toasts (sonner) for every mutation (department create/update/delete, ticket field assign, reply submit, reply-with-attachments submit).
+- The light teal+gold theme is preserved (no dark landing palette, no indigo/blue). All colors use Tailwind built-in variables.
+- `motion-safe:` not needed for this surface (no fancy transitions).
+
+Verification (scoped to my files):
+- `bun run lint` → EXIT 0, 0 errors, 0 warnings. All my files lint-clean (lib/tickets/index.ts, components/postyar/api.ts, components/postyar/admin/tickets.tsx, components/postyar/admin/ticket-departments.tsx, components/postyar/tickets/view.tsx unchanged, components/postyar/tickets/detail.tsx, api/tickets/route.ts unchanged, api/tickets/[id]/route.ts unchanged, api/tickets/[id]/replies/route.ts, api/tickets/[id]/attachments/[attachmentId]/route.ts, api/admin/tickets/route.ts (additive GET only), api/admin/tickets/departments/route.ts, api/admin/tickets/departments/[id]/route.ts, api/admin/tickets/[id]/assign/route.ts).
+- `bunx tsc --noEmit` → EXIT 0, 0 type errors. Filtered grep for "tickets|admin/ticket|replies|attachments|departments|assign" → empty (no errors anywhere in my files).
+- Smoke test: `curl http://localhost:3000/api/admin/tickets/departments` → HTTP 401 (auth gate works). Same for /api/tickets/x/replies (POST), /api/tickets/x/attachments/y (GET), /api/admin/tickets/x/assign (POST) — all 401 when unauthenticated.
+- Dev server: `tail dev.log` shows the Next.js 16 Turbopack server still compiling successfully with no errors after my edits; `GET /api/health 200` confirms it's alive.
+
+Stage Summary:
+- ITEM 17 (Ticket Departments — admin CRUD + assign) DONE:
+  * Admin can CRUD departments: name (e.g. «فنی», «مالی», «فروش», «پشتیبانی عمومی»), description, priority ordering (lower = higher), active toggle. UI is `<TicketDepartmentsManager />` inside a Dialog opened from `admin/tickets.tsx`. API: GET/POST /api/admin/tickets/departments + PATCH/DELETE /api/admin/tickets/departments/[id].
+  * Admin can assign a ticket to a department and/or a specific support-staff user — `assignTicketFields` lib helper + POST /api/admin/tickets/[id]/assign.
+  * Admin can set ticket priority (low/normal/high/urgent) — inline Select in each ticket row, wired to the same assign endpoint.
+  * Edit/delete departments — the `ticket-departments.tsx` view has inline edit (PencilIcon) + delete with AlertDialog confirm (Trash2Icon). Deleting a department sets tickets.departmentId to null via the schema onDelete: SetNull (already in schema, no migration needed).
+  * Department filter at the top of admin/tickets.tsx (separate Select from the existing status filter). Backed by the `departmentId` query param on GET /api/admin/tickets.
+- ITEM 18 (Ticket Attachments — image + zip) DONE:
+  * Allowed MIME groups: image/* (jpg, png, gif, webp) and application/zip (and .zip extension). Max sizes: image ≤ 5 MiB, zip ≤ 10 MiB. Anything else rejected with a Persian toast error. Multiple attachments per reply allowed (max 8).
+  * Reply composer in `tickets/detail.tsx` has a file input (`<Input type="file" multiple accept="image/*,.zip,application/zip">`) + a list of selected files with remove buttons + per-file size/type validation feedback. Submit is disabled if any file is invalid.
+  * On reply submit: POST to /api/tickets/[id]/replies as `multipart/form-data` (FormData). The new `api.replyTicketWithAttachments` client method does this.
+  * Existing attachments render in each reply bubble: images as `<img>` thumbnails (click → open full in new tab via the GET attachment URL), zip files as a download chip (FileArchiveIcon + filename + size + UploadIcon).
+  * API: POST /api/tickets/[id]/replies parses multipart with `await req.formData()`, validates each file (MIME + size), stores under `${STORAGE_ROOT}/tickets/<ticketId>/<uuid>-<filename>`, creates a `TicketAttachment` row per file linked to the new `TicketReply`. Returns the created reply with attachments. Enforces owner-or-staff (via `requireUser` + lib ownership check).
+  * GET /api/tickets/[id]/attachments/[attachmentId] streams the file with the right Content-Type, inline disposition for images / attachment disposition for zip, nosniff + DENY + private/no-store. Enforces owner-or-staff.
+- Lint + tsc clean (EXIT 0 for both, zero errors on my files).
+- Dev server stable (no compile errors, /api/health 200).
+- Did NOT touch: dashboard.tsx, postyar-app.tsx, prisma/schema.prisma, any other agent's file. The one file I touched that's not strictly in my "owned" list (`api/admin/tickets/route.ts`) was a single additive GET-param read (departmentId) — backward-compatible, the PATCH handler is untouched.
+- No blockers. Items 17 + 18 fully delivered end-to-end.
+
+---
+Task ID: revamp2-ads
+Agent: Ads-Display + Placements Specialist (general-purpose)
+Task: Items 15 (Ads display + placements CRUD) + 16 (Sticky bar placement) on POSTYAR Next.js.
+
+Work Log:
+
+0. CONTEXT / GROUND TRUTH (read before any edits):
+- Tailed worklog.md. The Prisma schema already has `AdPlacement` (key PK, labelFa, descriptionFa, kind, active, sortOrder) and `AdCampaign` now has `placement String @default("user_dashboard_top")` + `placementRel AdPlacement? @relation(fields: [placement], references: [key], onDelete: NoAction)` + `@@index([placement])`. `bun run db:push` already ran. I did NOT touch `prisma/schema.prisma`.
+- Read the existing owned files end-to-end before editing:
+  * `src/components/postyar/advertising/view.tsx` (user ad campaign creation + list, image upload via base64→sharp→WebP, hardcoded `PLACEMENTS` array, status badges). Left untouched — image-upload flow preserved, no break.
+  * `src/components/postyar/admin/ads.tsx` (admin ad review table + View dialog + reject AlertDialog + AdminGate wrapper). Rewrote additively; all existing functionality preserved (table, inline approve/reject, view dialog preview, reject confirm).
+  * `src/app/api/ads/route.ts`, `src/app/api/ads/[id]/route.ts` — left untouched (user campaign CRUD already wired through `lib/payments/advertising.ts`).
+  * `src/app/api/admin/ads/route.ts`, `src/app/api/admin/ads/[id]/reject/route.ts` — left untouched (admin list + reject already exist).
+  * `src/app/api/admin/ads/[id]/approve/route.ts` — rewrote to accept an OPTIONAL `{ placement?: string }` body so the admin can assign a placement AT APPROVAL TIME. Backward-compatible: empty body still works (existing `api.adminApproveAd(id)` client call unchanged).
+- Read `src/lib/payments/advertising.ts` (exports: `createAdDraft`, `submitAdForReview`, `adminApproveAd`, `adminRejectAd`, `listActiveAds`, `listMyAds`, `listAllAdsForAdmin`, `getAd`, `incrementImpression`, `incrementClick`). Did NOT modify it — reused `incrementImpression` + `incrementClick` (both already swallow errors via `.catch(() => undefined)`).
+- Read `src/components/postyar/api.ts` (existing `api.adminApproveAd(id)` + `api.adminRejectAd(id)` + `api.getAdminAdsTyped()` + types `AdDetailRow`/`AdminAdRow`). Did NOT modify it — for new endpoints I used direct `fetch(...)` inside the new components/views (api.ts is owned by another agent and is not in my owned-files list).
+- `src/lib/server/auth.ts`: `requireRole(["admin"])`, `requireUser()`, `AuthError`, `clientIp(req)`, `audit(...)` — all reused as-is.
+- shadcn/ui components available: button, card, dialog, alert-dialog, table, select, tabs, switch, input, label, textarea, badge, skeleton. lucide-react icons only (Megaphone, X, ExternalLink, Eye, Check, Pencil, Plus, Save, Trash2, Loader2). Persian digits via `toPersianDigits`, Jalali via `formatJalaliDate` from `@/lib/persian`.
+
+1. CREATED `src/app/api/admin/ads/placements/route.ts` (~115 lines, GET + POST):
+- GET: `requireRole(["admin"])` → list all AdPlacement rows ordered by `sortOrder asc, createdAt asc`. Joins a `db.adCampaign.groupBy({ by: ["placement"] })` to compute `campaignCount` per placement (any status) for the admin table badge. Returns `{ items: AdPlacementRow[] }` with `{ key, labelFa, descriptionFa, kind, active, sortOrder, createdAt, updatedAt, campaignCount }`.
+- POST: `requireRole(["admin"])` + zod schema `{ key: /^[a-z0-9_]{2,60}$/ , labelFa: 1..120, descriptionFa?: ≤500, kind: enum(sticky_bar|banner_inline|sidebar_card|fullscreen) default banner_inline, active: bool default true, sortOrder: int default 0 }`. Pre-checks `findUnique({ where: { key } })` to return a Persian 409 on duplicate key (Prisma would 400 otherwise). Creates the row, writes an `audit` row (`ad_placement_created`), returns `{ ok: true, placement }` 201. Persian errors throughout.
+
+2. CREATED `src/app/api/admin/ads/placements/[id]/route.ts` (~110 lines, PATCH + DELETE):
+- The URL `[id]` segment is the placement `key` (the PK).
+- PATCH: `requireRole(["admin"])` + zod schema (all fields optional, refined to require at least one). The `key` field is NEVER updatable here — it's the PK + the FK target from `AdCampaign.placement`; renaming would silently break campaigns. So PatchSchema simply omits `key`. Updates `labelFa`, `descriptionFa`, `kind`, `active`, `sortOrder`. Writes `audit` (`ad_placement_updated` with `meta.fields`).
+- DELETE: `requireRole(["admin"])`. Pre-checks `db.adCampaign.count({ where: { placement: key } })` and refuses with a Persian 409 if any campaign still references the placement (FK onDelete: NoAction would also reject, but we want a clear message so the admin reassigns first). Writes `audit` (`ad_placement_deleted`).
+
+3. CREATED `src/app/api/ads/serve/[placement]/route.ts` (~45 lines, GET, PUBLIC — no auth):
+- Reads the placement key from the URL (capped at 60 chars; bad input → `{ campaigns: [] }`).
+- Resolves the AdPlacement by key. If missing OR `active=false` → returns `{ campaigns: [] }` (silent — no error to the client).
+- Finds AdCampaigns where `placement = <key>`, `status in [approved, running]`, `startAt <= now OR null`, `endAt > now OR null`. Orders by `createdAt desc`, takes at most 10.
+- For each returned campaign, fires-and-forgets `void incrementImpression(id)` — the lib already catches errors so this never throws. The response is NOT blocked on the increment.
+- Returns `{ campaigns: [{ id, title, descriptionFa, link, imagePath, kind }] }` where `kind` is the placement's kind (all campaigns in a placement share the same kind). No auth.
+
+4. CREATED `src/app/api/ads/click/[id]/route.ts` (~15 lines, POST, PUBLIC — no auth):
+- Reads `id` from URL. Fires-and-forgets `void incrementClick(id)` (lib catches errors). Returns `{ ok: true }` 200 immediately — used by `<AdSlot>` / `<StickyAdBar>` for fire-and-forget click tracking (`keepalive: true` so the request survives navigation).
+
+5. REWROTE `src/app/api/admin/ads/[id]/approve/route.ts` (~70 lines, POST, admin only):
+- Body schema now accepts an OPTIONAL `{ placement?: string }` (regex `^[a-z0-9_]{2,60}$`). Empty body still works (the existing `api.adminApproveAd(id)` client call posts no body → parsed.success=true with no placement → old behavior).
+- If `placement` provided: `findUnique({ where: { key: placement } })` → 400 Persian error if missing. This verification happens BEFORE calling `adminApproveAd` so the row is never left in an inconsistent state.
+- Calls the existing `adminApproveAd({ id, adminId, ip })` lib (status → approved, reviewedBy, reviewedAt, audit `ad_approved`, owner notification — all preserved).
+- If the placement differs from the ad's current `placement`, does a follow-up `db.adCampaign.update({ where: { id }, data: { placement } })`. Returns the updated ad. This is additive — the lib is untouched.
+
+6. CREATED `src/components/layout/sticky-ad-bar.tsx` (~135 lines, "use client"):
+- Exported `function StickyAdBar({ placement, position = "top", className })` + default export.
+- Self-contained: fetches `GET /api/ads/serve/<placement>` itself via `useQuery` keyed `["ad-serve","sticky",placement]`. `enabled: mounted` (gated on a `mounted` state set in `useEffect`) so SSR returns null and there's no hydration noise.
+- Renders ONLY when there is an active sticky-bar campaign AND it hasn't been dismissed this session. Dismiss state: `sessionStorage[postyar_ad_dismissed_<id>] = "1"` (per-session, not persistent — bar reappears next session). Module helpers `isDismissed(id)` / `setDismissed(id)` wrap the storage access with try/catch (private mode safe). Component state mirrors the dismissed id so the bar hides immediately on click (no refetch needed).
+- Layout: `fixed inset-x-0 top-0 z-40 pt-[env(safe-area-inset-top)]` (top) OR `fixed inset-x-0 bottom-0 z-40 pb-[env(safe-area-inset-bottom)]` (bottom). RTL flex row: image thumbnail (40×40, rounded) | title + description (flex-1, truncated) | CTA link (bg-primary, opens in new tab) | X dismiss button. All clickables have `cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none`. `motion-safe:transition-transform` on the bar; `motion-safe:transition-colors` on the buttons. `dir="rtl"`.
+- CTA click handler fire-and-forgets `POST /api/ads/click/<id>` with `keepalive: true`.
+
+7. CREATED `src/components/layout/ad-slot.tsx` (~210 lines, "use client"):
+- Exported `function AdSlot({ placement, className })` + default export.
+- Fetches `GET /api/ads/serve/<placement>` via `useQuery` keyed `["ad-serve",placement]`, `staleTime: 30_000`.
+- Empty/error → returns `null` (no "no ads" placeholder — non-intrusive). Loading → `<AdSlotSkeleton kind={...} />` (skeleton shaped per kind: `h-32 w-full` for banner_inline, `h-40` for sidebar_card, `h-48 sm:h-64` for fullscreen).
+- Reads `kind` from `campaigns[0].kind` (since kind is per-placement, all rows share it). Routes by kind:
+  * `sticky_bar` → delegates to `<StickyAdBar placement={placement} position="top" />` (which is self-contained; ad-slot's own fetch data is discarded in this branch — acceptable since the dashboard agent mounts StickyAdBar directly for sticky bars).
+  * `fullscreen` → `<FullscreenStrip>` — a relative container with an X dismiss (per-session via React state, not storage; reappears on remount), optional image with a dark gradient overlay + title/description/CTA on top, fallback to a text card if no image.
+  * `sidebar_card` → list of `<SidebarCard>` — compact cards with image (h-24 cover) + title + 2-line description + CTA.
+  * `banner_inline` (default) → list of `<BannerInline>` — wide cards, image on the side (sm:w-40, full-height on sm+), title + 2-line description + CTA at the bottom (mt-auto).
+- Each ad renders as an `<a href={link} target="_blank" rel="noopener noreferrer" onClick={() => trackClick(id)}>` — the CTA click fire-and-forgets `POST /api/ads/click/<id>` with `keepalive: true`. If `link` is null the anchor is rendered as a non-link card (`href="#"`, no target/rel) so the layout stays stable.
+- All cards: `dir="rtl"`, `cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-safe:transition-shadow hover:shadow-md`. `group` + `group-hover:underline` on the CTA span.
+
+8. REWROTE `src/components/postyar/admin/ads.tsx` (~840 lines, "use client"):
+- Top of file: header comment updated to describe the two-tab structure.
+- Imports: added `useEffect` (for the placement form resync), `PencilIcon`, `PlusIcon`, `SaveIcon`, `Trash2Icon`, `Label`, `Textarea`, `Switch`, `Input`, `Select*`, `Table*`, `Tabs/TabsList/TabsTrigger/TabsContent`. Removed the unused `Loader2Icon` void hack (Loader2Icon is now used in multiple buttons).
+- New types/helpers: `AdPlacementRow` interface; `KIND_OPTIONS` array (sticky_bar→نوار چسبان, banner_inline→بنر درون‌خطی, sidebar_card→کارت کناری, fullscreen→تمام‌صفحه); `kindLabelFa(k)`.
+- Local fetch helpers (kept here because api.ts is owned by another agent):
+  * `fetchPlacements()` — GET /api/admin/ads/placements → `AdPlacementRow[]`.
+  * `createPlacement(body)` — POST → `AdPlacementRow`. Persian error extraction.
+  * `updatePlacement(key, body)` — PATCH → `AdPlacementRow`.
+  * `deletePlacement(key)` — DELETE.
+  * `approveAdWithPlacement(id, placement)` — POST /api/admin/ads/[id]/approve with `{ placement }` body → `{ ok, ad }`.
+- `AdminAdsInner` now wraps the existing campaign card in a `<Tabs>` with two triggers:
+  * «کمپین‌ها» — the existing campaigns table, PRESERVED 1:1 (status badges, inline Approve/Reject buttons, view dialog skeleton, error/empty states). Added a new «جایگاه» column showing `a.placement` (dir=ltr, monospace-ish) so the admin sees the current assignment at a glance.
+  * «جایگاه‌های تبلیغات» — hosts `<PlacementsManager>`.
+- A new `placementsQ` (GET /api/admin/ads/placements) is hoisted into `AdminAdsInner` so BOTH the placements tab AND the view-dialog Select can consume it.
+- Campaign View Dialog (additive): when the viewed ad's status is `pending` or `rejected`, an extra section appears below the stats badges: a Label «جایگاه نمایش (هنگام تأیید)», a `<Select>` populated from `placementsQ` (each item shows «{labelFa} — {key}», dir=ltr), and a primary «تأیید و انتشار در جایگاه» button. The Select value defaults to the ad's current placement and updates local state `pendingPlacement`. The button calls `approveWithPlacementMut.mutate({ id, placement: pendingPlacement })` → on success: toast, closes the dialog, invalidates `["admin","ads"]`. Disabled while pending OR if no placements exist (with a hint message inside the SelectContent telling the admin to create one from the other tab).
+- The existing inline Approve button (CheckIcon in the table row) is PRESERVED — it calls `api.adminApproveAd(id)` (no body, no placement change). So admins can quick-approve without reassigning, OR open the dialog to assign a placement at approval time.
+- `PlacementsManager` component: shadcn `<Table>` of all placements (columns: کلید / برچسب / نوع / ترتیب / کمپین‌ها / وضعیت / عملیات). Active=emerald «فعال» badge; inactive=secondary «غیرفعال». Delete button is disabled when `campaignCount > 0` (refuses on the server anyway). Edit button opens the edit dialog. «جایگاه جدید» button opens the create dialog. Loading skeleton + empty state with CTA. Persists react-query invalidation for BOTH `["admin","ad-placements"]` AND `["admin","ads"]` after every mutation.
+- `PlacementFormDialog` (shared between create + edit, two modes):
+  * Fields: کلید (Input, dir=ltr, regex-validated on submit, READ-ONLY in edit mode — PK + FK target), برچسب فارسی, توضیحات (Textarea, optional), نوع جایگاه (Select with 4 options), ترتیب نمایش (number Input), فعال (Switch).
+  * Reset/sync via `useEffect([open, mode, initial])` — when the dialog opens, edit mode loads from `initial`, create mode resets to defaults. The edit dialog is keyed by `editing?.key` in the parent so switching between rows also remounts+re-syncs.
+  * Submit validates the key regex client-side and shows a Persian toast on failure. Calls `onSubmit(body)` which routes to `createMut` or `updateMut`. Submit button shows `Loader2Icon` spin while pending.
+- Existing reject AlertDialog preserved verbatim. Existing AdminGate wrapper preserved.
+
+Constraints honored (universal):
+- All Persian text, RTL (`dir="rtl"` on every section root, Dialog Content, AlertDialog Content, AdSlot/StickyAdBar root). Persian digits via `toPersianDigits(...)` for campaign counts, impression/click counts, sortOrder, placement campaign counts, tab counts.
+- lucide-react icons ONLY (Megaphone, X, ExternalLink, Eye, Check, Pencil, Plus, Save, Trash2, Loader2). Verified.
+- `cursor-pointer` + `focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none` on every custom clickable (ad cards, CTA links, dismiss buttons, edit/delete buttons, form submit, file-input-style labels).
+- Loading skeleton + error + empty states on every async surface (campaigns table, placements table, ad-slot serve fetch). Empty AdSlot returns `null` (no chrome) — non-intrusive.
+- Toasts (sonner) for every mutation: campaign approve / approve-with-placement / reject / placement create / update / delete — all with Persian success + error messages.
+- `motion-safe:` used on all transitions (`transition-transform` on StickyAdBar, `transition-shadow` on ad cards, `transition-colors` on buttons/CTAs).
+- Light teal+gold theme preserved (Tailwind built-in vars: `bg-card`, `text-card-foreground`, `bg-primary`/`text-primary-foreground`, `border`, `text-muted-foreground`, `bg-muted`, `bg-emerald-500` for active/running badges). No dark landing palette, no indigo/blue.
+- Auth: `requireRole(["admin"])` on placements CRUD (GET/POST/PATCH/DELETE) + on approve/reject. Public (no auth) on `/api/ads/serve/[placement]` (GET) and `/api/ads/click/[id]` (POST). User auth on their own campaign CRUD (already exists in `/api/ads` routes — untouched).
+
+Verification (scoped to my files):
+- `cd /home/z/my-project && bun run lint` → EXIT 0, 0 errors, 0 warnings. All my files lint-clean.
+- `cd /home/z/my-project && bunx tsc --noEmit` → EXIT 1 OVERALL (10 errors), but ZERO errors in my files. All 10 errors live in `src/components/postyar/admin/plans.tsx` (6 errors) and `src/lib/payments/plans.ts` (4 errors) — files owned by other agents (the plans revamp). Filtering `bunx tsc --noEmit 2>&1 | grep -E "ads|ad-slot|sticky-ad|advertising|placements|serve|click"` → empty (zero hits). My TypeScript is fully clean:
+  * `src/app/api/admin/ads/placements/route.ts` ✓
+  * `src/app/api/admin/ads/placements/[id]/route.ts` ✓
+  * `src/app/api/ads/serve/[placement]/route.ts` ✓ (uses `incrementImpression` from lib)
+  * `src/app/api/ads/click/[id]/route.ts` ✓ (uses `incrementClick` from lib)
+  * `src/app/api/admin/ads/[id]/approve/route.ts` ✓ (additive — backward-compatible with existing `api.adminApproveAd(id)` call)
+  * `src/components/layout/ad-slot.tsx` ✓
+  * `src/components/layout/sticky-ad-bar.tsx` ✓
+  * `src/components/postyar/admin/ads.tsx` ✓ (including the `ReturnType<typeof useQuery<AdPlacementRow[]>>` prop type — valid TS 4.7+ instantiation-expression syntax)
+- Did NOT touch: dashboard.tsx, postyar-app.tsx, prisma/schema.prisma, advertising/view.tsx, api/ads/route.ts, api/ads/[id]/route.ts, api/admin/ads/route.ts, api/admin/ads/[id]/reject/route.ts, src/components/postyar/api.ts, src/lib/payments/advertising.ts. The dashboard agent will wire `<AdSlot placement="user_dashboard_top" />`, `<AdSlot placement="user_dashboard_sidebar" />`, and `<StickyAdBar placement="sticky_bar" position="top" />` into dashboard.tsx — components are exported and ready.
+
+Stage Summary:
+- ITEM 15 (Ads display + placements) DONE:
+  (a) Admin placement CRUD: full Table + create Dialog + edit Dialog + delete AlertDialog inside `admin/ads.tsx` under the «جایگاه‌های تبلیغات» tab. Backed by GET/POST `/api/admin/ads/placements` + PATCH/DELETE `/api/admin/ads/placements/[id]`. Key is read-only in edit (PK + FK target). Delete refused while campaigns are linked.
+  (b) Admin assigns a campaign to a placement AT APPROVAL TIME: inside the campaign View dialog, a `<Select>` (populated from `/api/admin/ads/placements`) + «تأیید و انتشار در جایگاه» button. The approve route accepts an optional `{ placement }` body, verifies the placement exists, then approves + updates `AdCampaign.placement`.
+  (c) `<AdSlot placement="...">` client component: fetches `/api/ads/serve/<placement>`, renders by kind (banner_inline wide card / sidebar_card compact card / sticky_bar → delegates to StickyAdBar / fullscreen dismissible strip). Empty → null. Loading → skeleton. Click → fire-and-forget POST /api/ads/click/<id>. dir=rtl, motion-safe transitions, lucide icons.
+  (d) Public serve route `/api/ads/serve/[placement]`: returns `{ campaigns: [{ id, title, descriptionFa, link, imagePath, kind }] }` for active+approved+currently-running campaigns in that placement. Fire-and-forget impression increment per campaign. No auth.
+- ITEM 16 (Sticky bar) DONE:
+  `<StickyAdBar placement="..." position="top" | "bottom">` client component: `fixed inset-x-0 top-0 z-40` (or `bottom-0` with `pb-[env(safe-area-inset-bottom)]`). Self-contained (fetches its own serve data). Renders only when an active sticky-bar campaign exists AND it's not dismissed (sessionStorage `postyar_ad_dismissed_<id>`). Layout: thumbnail | title+desc | CTA | X dismiss. `motion-safe:transition-transform`. dir=rtl. CTA opens in new tab + tracks click.
+- Both client components (`AdSlot` in `src/components/layout/ad-slot.tsx`, `StickyAdBar` in `src/components/layout/sticky-ad-bar.tsx`) are EXPORTED (named + default) and ready for the dashboard agent to import:
+  * `import { AdSlot } from "@/components/layout/ad-slot";`
+  * `import { StickyAdBar } from "@/components/layout/sticky-ad-bar";`
+- Lint clean (EXIT 0). tsc: zero errors in my files (the 10 reported errors all live in plans.tsx + payments/plans.ts, owned by other agents).
+- No blockers. Items 15 + 16 fully delivered end-to-end.
+
+---
+
+## Task ID: revamp2-plans — Granular Plan Management (items 31, 32, 33, 34)
+
+**Scope:** Admin plan management UI + admin/public plan APIs + plans helper lib. Prisma schema already extended by the foundation agent (`Plan.features`, `imageUrl`, `discountPct`, `renewalDiscountPct`, `renewalDiscountWindowDays`, `sortOrder`). `bun run db:push` already ran. I did NOT touch `prisma/schema.prisma`.
+
+### Files edited (all 6 owned files + 1 shared file additively)
+
+1. **`src/lib/payments/plans.ts`** (additive rewrite — backward-compatible):
+   - Added a granular feature-catalog system: `PlanBooleanFeatureKey` (23 keys), `PlanNumericFeatureKey` (8 keys), `PlanFeatureKey` union, `PlanFeatures` JSON shape (`Partial<Record<PlanFeatureKey, boolean | number>>`), `PlanFeatureType`, `PlanFeatureDef`, `PlanFeatureGroup`.
+   - Added the source-of-truth `FEATURE_CATALOG` constant — exactly the 6 groups + 31 items specified in item 31: (1) انتشار و محتوا, (2) بات و اتوماسیون, (3) هوش مصنوعی, (4) مقاصد و دکمه‌ها, (5) یکپارچه‌سازی, (6) ابزارها. Each item has a Persian label + type (`boolean` or `number`).
+   - Added helpers: `ALL_FEATURE_DEFS` (flat list), `isBooleanFeature(key)`, `getFeatureBoolean(features, key, fallback)`, `getFeatureNumber(features, key, fallback)`, `countEnabledFeatures(features)` (booleans=true + numerics>0), `parsePlanFeatures(raw)` (defensive parse + per-key type normalization, floors numerics ≥ 0, coerces numeric strings, rejects unknown keys silently).
+   - Extended `PublicPlanView` interface to include the new fields: `features`, `imageUrl`, `discountPct`, `renewalDiscountPct`, `renewalDiscountWindowDays`, `sortOrder`.
+   - Updated `listPublicPlans()` to: order by `[{ sortOrder: "asc" }, { priceRials: "asc" }]` (was just `priceRials asc`); return the new fields parsed from the row (`parsePlanFeatures(p.features)` for the JSON blob; `?? 0` defaults for the integer columns in case the DB returns null on legacy rows).
+   - `PlanQuota` type and the seeding helpers (`ensurePlansSeeded`, SEED_PLANS) unchanged — backward-compat with the existing quota engine (`getQuotaState`/`requireQuota`/`incrementQuotaUsage`). `quota` JSON is no longer the source of truth for module gating but is kept populated for the legacy quota engine.
+
+2. **`src/components/postyar/api.ts`** (SHARED INFRA — additive only; mirrors the server types so the admin UI gets full typing. This file is not strictly in the "owned" list but is shared across all postyar admin views; the previous ticket-system task set the precedent of editing shared infra additively):
+   - Mirrored the `PlanBooleanFeatureKey` / `PlanNumericFeatureKey` / `PlanFeatureKey` / `PlanFeatures` types from `lib/payments/plans.ts` so client-side code doesn't have to import server-side modules.
+   - Extended `PlanRow` (public) with the new fields: `features`, `imageUrl`, `discountPct`, `renewalDiscountPct`, `renewalDiscountWindowDays`, `sortOrder`. The existing consumers (`payment/view.tsx`, `payment/plans.tsx`, `admin/discounts.tsx`, `landing/landing.tsx`) read only legacy fields and remain binary-compatible — confirmed via `bunx tsc --noEmit` (zero errors project-wide).
+   - Extended `AdminPlanRow` with the same new fields.
+   - Added `AdminPlanInput` (POST create body type) and `AdminPlanPatch` (PATCH partial body type) — both fully typed with the new optional fields. `adminCreatePlan` and `adminUpdatePlan` signatures now use these types instead of inline anonymous types. Call-site behavior unchanged for old callers (all params are optional except the previously-required ones).
+
+3. **`src/app/api/admin/plans/route.ts`** (full rewrite of GET + POST):
+   - GET: now orders by `[{ sortOrder: "asc" }, { priceRials: "asc" }]`, returns the new fields (`features` via `parsePlanFeatures`, `featureCount` via `countEnabledFeatures`, `imageUrl`, `discountPct`, `renewalDiscountPct`, `renewalDiscountWindowDays`, `sortOrder` — all with `?? 0` / `?? null` defaults for legacy rows). Uses `safeJsonParse` from `@/lib/server/auth` instead of unsafe `JSON.parse` for `quota`.
+   - POST (`PostSchema`): extended with zod-validated fields:
+     * `features: z.record(z.string(), z.union([z.boolean(), z.number()])).optional()` — JSON of feature-key → boolean|number.
+     * `imageUrl: z.string().max(2048).optional()`.
+     * `discountPct: z.number().int().min(0).max(100).optional()` — enforced 0 ≤ discountPct ≤ 100 (item 32 validation).
+     * `renewalDiscountPct: z.number().int().min(0).max(100).optional()`.
+     * `renewalDiscountWindowDays: z.number().int().min(0).max(365).optional()` — enforced 0–365 days (item 34 validation).
+     * `sortOrder: z.number().int().optional()`.
+   - POST persists: runs the parsed `features` through `parsePlanFeatures` to normalize/coerce, then `JSON.stringify` into the DB column. Defaults: `imageUrl=null`, `discountPct=0`, `renewalDiscountPct=0`, `renewalDiscountWindowDays=0`, `sortOrder=0`.
+   - POST audit meta now includes `discountPct` and `featureCount`.
+   - All existing `requireRole(["admin"])` enforcement + `clientIp` + `audit` calls preserved.
+
+4. **`src/app/api/admin/plans/[id]/route.ts`** (full rewrite of PATCH; DELETE unchanged):
+   - PATCH (`PatchSchema`): same new fields added (all optional for partial update). `imageUrl` accepts `z.string().max(2048).nullable().optional()` so a PATCH can explicitly clear the image (`imageUrl: null`).
+   - PATCH persists: when `features` is present in the body, runs it through `parsePlanFeatures` (same normalization as POST) and stores `JSON.stringify(features)`. When `imageUrl !== undefined`, persists `parsed.data.imageUrl ?? null` (so `null` clears it).
+   - Existing `requireRole(["admin"])` + audit + free-plan guard preserved. DELETE handler untouched.
+
+5. **`src/app/api/plans/route.ts`** (NO EDITS NEEDED):
+   - The public GET just calls `listPublicPlans()` and serializes the result. Since `listPublicPlans` now returns the new fields, the public API automatically returns `features, imageUrl, discountPct, renewalDiscountPct, renewalDiscountWindowDays, sortOrder`. No code change was needed here — the contract is satisfied by the lib-layer change.
+
+6. **`src/components/postyar/admin/plans.tsx`** (full rewrite — ~1070 lines, "use client"):
+   - **Form state** (`PlanFormState`): `features` is now a `PlanFeatures` object (not JSON text) so the UI never round-trips through a JSON editor. `imageUrl`, `discountPct`, `renewalDiscountPct`, `renewalDiscountWindowDays`, `sortOrder` are all string fields (controlled inputs). The legacy `quotaJson` is kept in a collapsible `<details>` for advanced backward-compat editing.
+   - **`emptyFeatures()` + `fromRow()`**: seed every known feature key (23 booleans = false, 8 numerics = 0) so the admin UI shows the full catalog even for legacy plans that predate `revamp2`. `fromRow` coerces values defensively (booleans strictly; numerics floored + clamped ≥ 0).
+   - **`saveMut` (create/update)**:
+     * Validates: `priceRials ≥ 0`, `intervalMonths 1–12`, `discountPct 0–100`, `renewalDiscountPct 0–100`, `renewalDiscountWindowDays 0–365`, `sortOrder ≥ 0`, `quotaJson` parses.
+     * Builds a *tidy* features payload — only includes keys whose value differs from default (boolean `true` or numeric `> 0`). Keeps the stored JSON small.
+     * Empty `imageUrl` is sent as `null` (PATCH) / `null` (POST).
+     * Toasts on success/error. Invalidates both `["admin","plans"]` and `["public","plans"]` query keys (the public catalog refetches).
+   - **Inline mutations**: `toggleActiveMut` (inline Switch on each row → PATCH `{active}`), `setSortOrderMut` (inline number input on blur → PATCH `{sortOrder}` — silent, no toast to avoid spamming on every keystroke).
+   - **`imageUploadMut`**: calls `api.uploadMedia(file, "image")` which POSTs to `/api/media-upload`. On success, sets `form.imageUrl = "/api/media/${id}"` (the auth-gated stream URL). The contract: `/api/media-upload` returns `{ id, publicId, kind, mime, sizeBytes, width, height }` — I use `id` to build the stream URL. The admin (authenticated) sees the thumbnail in the form; for the public catalog page, the admin can paste an absolute `https://...` URL instead. Both modes are supported by the `imageUrl` text input.
+   - **Live discount preview** (`useMemo`): `«قیمت با تخفیف: X ریال»` = `formatRials(priceRials × (1 − discountPct/100))`. Shown in a dashed-border box; falls back to «بدون تخفیف — مبلغ کامل نمایش داده می‌شود.» when discountPct is 0 or invalid.
+   - **Renewal discount note**: dynamically interpolates the form's `renewalDiscountWindowDays` and `renewalDiscountPct` into the Persian sentence «اگر کاربر تا N روز قبل از پایان اشتراک تمدید کند، M٪ تخفیف اعمال می‌شود.».
+   - **List view** (Table):
+     * Columns: thumbnail, code, name, price, interval, features+discount badges, sort-order input, active+public+subscription badges, actions.
+     * Price cell: when `discountPct > 0`, shows the original price with strikethrough (muted) above the discounted price in emerald-700.
+     * Features cell: shows a `«N امکان»` badge (via `countEnabledFeatures`), plus a `«X٪ تخفیف»` badge if discount is active, plus a `«تمدید: X٪»` outline badge if renewal discount is active.
+     * Sort-order cell: inline `<Input type="number">` — onBlur sends a PATCH.
+     * Active cell: inline `<Switch>` + «فعال»/«غیرفعال» text + «عمومی»/«خصوصی» badge + «N اشتراک» badge.
+     * Rows are sorted client-side by `sortOrder asc, priceRials asc` (defensive — the API already returns this order).
+   - **`PlanThumb`** component: shows a `<img>` thumbnail (with `loading="lazy"`) when `imageUrl` is set, otherwise a `size×size` placeholder with the plan's first letter in muted colors.
+   - **`FeatureRow`** component: renders a single feature — boolean keys get a `<Checkbox>` + label (RTL aligned with `cursor-pointer` + `focus-within:ring-2`); numeric keys get a label + `<Input type="number" min={0}>` + «۰ = نامحدود» hint.
+   - **Accordion**: shadcn `Accordion` with `type="multiple"` and `defaultValue=["publishing", "ai"]` (so the two most common groups are open by default). Each `AccordionTrigger` shows the group's title + a `«X از Y»` badge counting enabled items in that group. The trigger has `cursor-pointer`.
+   - **States**: loading (`<Skeleton>` ×3), error (`<AlertCircleIcon>` + «بارگذاری پلن‌ها ناموفق بود.» + retry button), empty (`<PackageIcon>` + «هیچ پلنی تعریف نشده است.» + CTA). `q.refetch()` button in the header.
+   - **Toggles**: «فعال» + «عمومی» switches preserved. The `free` plan's delete button stays disabled (existing behavior).
+   - **RTL**: `dir="rtl"` on the outermost container + every Dialog/AlertDialog Content. `dir="ltr"` on all numeric/code/text-monospace inputs and the quota JSON textarea.
+   - **Persian digits**: `toPersianDigits(...)` on every count, percentage, interval, feature-count, subscription-count.
+   - **Icons** (lucide-react only): `AlertCircleIcon`, `Loader2Icon`, `PackageIcon`, `PencilIcon`, `PlusIcon`, `RefreshCwIcon`, `SaveIcon`, `TagIcon`, `Trash2Icon`, `UploadCloudIcon`. Verified exports.
+   - **Accessibility**: every custom click target has `cursor-pointer` + either `aria-label` or visible text. Switch/Checkbox wrappers are `<label>` elements so clicking the text toggles the control.
+
+### Verification
+
+- `cd /home/z/my-project && bun run lint` → EXIT 0, **0 errors, 0 warnings**. Filtered to my files: clean. (The only complaint during development was the React Compiler wanting `q.data` instead of `q.data?.items` as the `useMemo` dep — fixed by widening the dep to `q.data`; then a stale eslint-disable comment was removed.)
+- `cd /home/z/my-project && bunx tsc --noEmit 2>&1 | grep -E "admin/plans|api/plans|payments/plans" | head` → **empty** (zero type errors in my files). Full project `tsc --noEmit` also exits clean (zero overall).
+- Note on a TS subtlety: `PlanFeatures = Partial<Record<PlanFeatureKey, boolean | number>>` (permissive, single Record). My first attempt used `Partial<Record<K1, boolean> & Record<K2, number>>` — TS incorrectly resolved indexed access to `undefined` and rejected every assignment. The simpler `Partial<Record<...>>` form works correctly for both read and write. Per-key type enforcement (boolean vs number) is delegated to the typed helpers `getFeatureBoolean` / `getFeatureNumber` and the API-layer `parsePlanFeatures` normalizer; the loose type is intentional.
+- Dev-server smoke test: not run — the dev server is owned by another agent and wasn't running on this machine at the time of my work (port 3000 refused connection). The lint + tsc verification per the task spec passes cleanly.
+
+### Items 31–34 confirmed delivered
+
+- **ITEM 31 — Granular feature checkboxes**: ✓ All 23 boolean toggles + 8 numeric quotas grouped into the 6 collapsible Accordion sections exactly as specified. Persisted to `Plan.features` JSON. The legacy `quota` JSON stays for backward-compat with the existing quota engine (kept in a collapsible `<details>` for advanced editing).
+- **ITEM 32 — Percentage discount**: ✓ Number input (0–100), zod-validated in both POST and PATCH. Live preview `«قیمت با تخفیف: X ریال»` = `priceRials × (1 − discountPct/100)` updates via `useMemo` as the admin types.
+- **ITEM 33 — Plan image**: ✓ Text URL input + an upload button that POSTs to `/api/media-upload`. On success the URL is set to `/api/media/${id}` (the auth-gated stream endpoint from `src/app/api/media/[id]/route.ts`). Thumbnail preview (`<img>`) when set; first-letter placeholder otherwise. A «حذف تصویر» ghost button clears the field (sends `imageUrl: null` on save).
+- **ITEM 34 — Renewal discount**: ✓ `renewalDiscountPct` (0–100) + `renewalDiscountWindowDays` (0–365), both zod-validated. The Persian sentence «اگر کاربر تا N روز قبل از پایان اشتراک تمدید کند، M٪ تخفیف اعمال می‌شود.» is rendered live with N/M substituted from the form's current values.
+
+### Additional list-view requirements (per spec)
+
+- ✓ Image thumbnail (PlanThumb component — 36px in table, 64px in form).
+- ✓ Name + price with Persian digits + «ریال» (via `formatRials`); strikethrough when `discountPct > 0`.
+- ✓ Interval in Persian months.
+- ✓ Discount badge (`«X٪ تخفیف»`) when `discountPct > 0`.
+- ✓ Renewal badge (`«تمدید: X٪»` outline) when `renewalDiscountPct > 0`.
+- ✓ Active toggle (inline Switch → PATCH).
+- ✓ Feature-count badge (`«N امکان»` via `countEnabledFeatures`).
+- ✓ Sort by `sortOrder` then `priceRials` (both API-side and client-side).
+- ✓ Sort-order input on each row (inline number input onBlur → PATCH).
+- ✓ Loading skeleton + error + empty states.
+- ✓ Toast (sonner) on every mutation (create, update, delete, toggle active, set sort order, image upload).
+- ✓ `cursor-pointer` + `focus-visible:ring-2` (or `focus-within:ring-2` for label-wrapped checkboxes) on every custom click target.
+- ✓ Persian digits via `toPersianDigits(...)` from `@/lib/persian`.
+- ✓ RTL `dir="rtl"` on every section root + Dialog/AlertDialog Content.
+
+### Constraints honored
+
+- All Persian text, RTL.
+- lucide-react icons ONLY — no emojis.
+- `requireRole(["admin"])` enforced on both admin routes (unchanged).
+- The public GET `/api/plans` is unauthenticated and returns the new fields.
+- No new dashboard route — the existing `AdminPlansView` is rendered via the existing dashboard router (untouched).
+- Did NOT touch: `dashboard.tsx`, `postyar-app.tsx`, `prisma/schema.prisma`, `prisma/schema.test.prisma`, any other agent's file. The one shared file I touched (`src/components/postyar/api.ts`) was edited **additively only** — extended types and method signatures in a backward-compatible way (all new fields are optional in PATCH and POST bodies, all new response fields are supersets of the old shape). Verified no consumer breaks via `bunx tsc --noEmit`.
+
+### Stage Summary
+
+- Items 31, 32, 33, 34 fully delivered end-to-end.
+- Lint + tsc clean (EXIT 0 for both, zero errors on my files; full project also clean).
+- No blockers. Ready for the next agent.
+
+---
+
+## Task ID: revamp2-backend-admin — Backend Admin Fixes (items 28, 29, 30, 35, 39, 40, 41)
+
+**Scope:** Admin stats Jalali date fix, admin reset-password flow, audit/health
+admin-only verification + comments, settings grouped rewrite + SMS/email/
+gateway/AI/security override via SystemSetting, gold price config UI + APIs,
+payment bank-gateway simplification (remove direct/intermediary distinction).
+Prisma schema stable — `GoldPriceConfig` + `SystemSetting` models already
+exist. I did NOT touch `prisma/schema.prisma`, dashboard.tsx, postyar-app.tsx,
+or any other agent's files. The one shared file I touched
+(`src/components/postyar/api.ts`) was edited **additively only** — new types +
+new methods; existing method signatures either unchanged or widened
+(`mode` optional, response shape superset).
+
+### Files edited/created (all in my owned list)
+
+1. **`src/app/api/stats/admin/route.ts`** (edited) — ITEM 29:
+   - Replaced `generatedAtFa: toPersianDigits(new Date().toISOString())`
+     (which only Persian-digitized the Gregorian ISO string — bug) with
+     `generatedAtFa: formatJalaliDateTime(new Date(), { withTime: true })`
+     (Tehran-TZ Jalali date+time, e.g. «۱۵۰۵ مهر ۷، چهارشنبه - ۱۵:۳۰»).
+   - Added `generatedAt: new Date().toISOString()` alongside (raw ISO for
+     programmatic consumers).
+   - Swapped `toPersianDigits` import for `formatJalaliDateTime`.
+
+2. **`src/components/postyar/admin/stats.tsx`** (edited) — ITEMS 29, 35:
+   - Added `generatedAt?: string` to `AdminStatsResponse` type.
+   - Added the comment block:
+     `// NOTE (ITEM 35): این بخش فقط برای مدیر سامانه قابل مشاهده است.`
+     documenting that `/api/stats/admin` enforces `requireRole(["admin"])`
+     and `generatedAtFa` is Tehran-TZ Jalali.
+   - The view's only displayed date is `data.generatedAtFa` (CalendarClock
+     badge). All other counts/labels are static Persian or already-Jalali
+     (`u.createdAtFa`, etc., come from the admin users route which already
+     uses `formatJalaliDateTime`). No Gregorian dates leak to the admin UI.
+
+3. **`src/app/api/admin/users/[id]/reset-password/route.ts`** (CREATED) —
+   ITEM 30:
+   - POST handler, admin-only (`requireRole(["admin"])`).
+   - Body schema: `{ newPassword: string ≥8 chars ≤128 }` (zod-validated).
+   - Refuses self-reset with a Persian 400 message — the admin must use
+     the regular /api/auth/me/password flow.
+   - Hashes the new password via the existing `hashPassword` (bcryptjs,
+     12 rounds) imported from `@/lib/server/auth`.
+   - Updates `User.passwordHash` + bumps `updatedAt`.
+   - Audits as `user_password_reset` (targetType=user) — does NOT log the
+     new password; only the target user's email + name in `meta`.
+
+4. **`src/components/postyar/admin/users.tsx`** (rewritten) — ITEM 30:
+   - Added imports: `KeyRoundIcon`, `Dialog` (and friends), `Label`,
+     `useSession`.
+   - Added the comment block:
+     `// NOTE (ITEM 35): این بخش فقط برای مدیر سامانه قابل مشاهده است.`
+   - New row action button «تغییر رمز» (disabled when `me.id === u.id`,
+     with a Persian tooltip explaining self-reset goes through profile).
+   - New `<ResetPasswordDialog>` component: new-password input (min 8,
+     type=password with a «نمایش رمز» reveal checkbox) + confirm input +
+     mismatch error message. Submit button calls
+     `api.adminResetUserPassword(id, newPassword)`. Toast on success/
+     error. `useQueryClient().invalidateQueries(["admin","users"])` on
+     success.
+   - Preserved: existing suspend/unsuspend AlertDialog + role-change
+     AlertDialog (with added `cursor-pointer focus-visible:ring-2`).
+   - All Persian, RTL, lucide icons only, Persian digits, Jalali dates.
+
+5. **`src/lib/providers/util.ts`** (additively extended) — ITEM 40:
+   - Existing `sanitizeRaw` + `scrubTokenFromUrl` preserved 1:1.
+   - Added `getSetting(key, fallback)` — resolves a config value with
+     precedence: `SystemSetting` (DB lookup) → `process.env[key]` →
+     `fallback`. Backed by a 30s in-process cache (`settingCache` Map)
+     so hot paths don't re-query the DB on every call.
+   - Added `invalidateSettingsCache(key?)` — called by the settings API
+     after every POST/PATCH/DELETE so provider libs see the change on the
+     next call.
+
+6. **`src/lib/providers/sms/index.ts`** (edited, additive) — ITEM 40:
+   - Converted module-level `const PROVIDER = process.env...` constants
+     to in-function `await getSetting("POSTYAR_SMS_PROVIDER", "")` calls
+     inside `dispatchOtp` + `dispatchGeneric`.
+   - Same for `POSTYAR_SMS_API_KEY`, `POSTYAR_SMS_SENDER`,
+     `POSTYAR_SMS_TEMPLATE_ID`, `POSTYAR_SMS_USERNAME`,
+     `POSTYAR_SMS_PASSWORD`.
+   - When no `SystemSetting` row exists, behavior is IDENTICAL to the
+     previous env-only version — backward compat preserved.
+
+7. **`src/lib/providers/email/index.ts`** (edited, additive) — ITEM 40:
+   - Converted module-level `const HOST = process.env.POSTYAR_SMTP_HOST`
+     etc. to in-function `await getSetting(...)` calls inside `sendEmail`.
+   - Same override chain: SystemSetting → env → fallback default.
+   - Existing dev-preview path (no host/user → cache.set + return ok)
+     preserved. No behavior change when SystemSetting is empty.
+
+8. **`src/app/api/admin/settings/route.ts`** (rewritten) — ITEMS 39, 40:
+   - Allow-list expanded + grouped. New `GROUPS` constant exposes 7
+     groups to the UI (`general`, `sms_panel`, `email_panel`,
+     `bank_gateway`, `gold_config`, `ai_config`, `security`), each with
+     a Persian `titleFa` + `descriptionFa` + a `keys` array where each
+     key carries `{ key, labelFa, descFa, sensitive?, options?, default? }`.
+   - GET now returns `{ items, allowedKeys, groups }` (groups is additive
+     — existing callers reading items/allowedKeys still work).
+   - POST preserved 1:1 (single-key upsert, admin-only, audited).
+   - NEW PATCH handler — accepts either `{ items: [{key, value}, ...] }`
+     for batch save OR `{ key, value }` for single save. Validates ALL
+     keys BEFORE persisting (atomicity — no half-saved batch). Calls
+     `invalidateSettingsCache(key)` per key so provider libs see the
+     change immediately. Audits with `mode: "batch"` + key list.
+   - NEW DELETE handler — `{ key }` body, deletes the SystemSetting row
+     (revert to env / built-in default). Audits as
+     `system_setting_reset`.
+   - The allow-list uses env-var-named keys (`POSTYAR_SMS_PROVIDER`,
+     `POSTYAR_SMTP_HOST`, `POSTYAR_BANK_DIRECT_MERCHANT`, `POSTYAR_AI_API_KEY`,
+     ...) so the provider libs' `getSetting` calls speak the same
+     namespace. The `general` group keeps the friendlier `site.*` keys
+     (not bound to env; consumed by landing/auth code via SystemSetting).
+
+9. **`src/components/postyar/admin/settings.tsx`** (rewritten) — ITEMS
+   39, 40:
+   - Two-column responsive grid of `<SettingsGroupCard>` (one Card per
+     group), each with header (icon + Persian title + "X از Y پیکربندی‌شده"
+     badge) + description + a list of `<SettingField>` + a per-card
+     «ذخیرهٔ گروه» button (PATCH batch save).
+   - `<SettingField>` renders: the key in a `<code>` tag (dir=ltr,
+     monospace), Persian label, description sentence, and an Input (or
+     Select when `def.options` exists; password-type for sensitive keys
+     with a masked preview + «نمایش مقدار» toggle). Per-key
+     «بازنشانی به پیش‌فرض» ghost button (DELETE the row).
+   - Local dirty-state tracking per card; only dirty keys sent in PATCH.
+   - Loading skeleton + error + empty states; refresh button in header.
+   - Security note card at the bottom (Persian) about sensitive keys.
+   - Added the comment block:
+     `// NOTE (ITEM 35): این بخش فقط برای مدیر سامانه قابل مشاهده است.`
+   - All Persian, RTL, lucide icons only, Persian digits.
+
+10. **`src/app/api/admin/gold/config/route.ts`** (CREATED) — ITEM 28:
+    - GET handler — admin-only. Returns the singleton GoldPriceConfig row
+      (or sensible defaults when none exists yet): `{ source, endpoint,
+      token: tokenPreview (MASKED), tokenPreview, selector18k, selectorEmami,
+      selectorBahar, selectorOunce, refreshMinutes, active, updatedAt,
+      updatedAtFa }`. The raw token is NEVER returned to the UI; only a
+      masked preview (last 4 chars via `maskToken`).
+    - POST handler — admin-only. Zod-validated body `{ source, endpoint?,
+      token?, selector18k?, selectorEmami?, selectorBahar?, selectorOunce?,
+      refreshMinutes?, active? }`. Token handling: when `token` is
+      provided (non-empty), it is encrypted at rest with AES-256-GCM
+      (`encryptString` from `@/lib/security/crypto`) before storage. When
+      `token` is empty/null, the existing token is cleared (revoke). When
+      `token` is `undefined`, the existing token is preserved (so the
+      admin can edit other fields without re-entering the secret).
+    - Validates that `custom_json` requires `endpoint`; `custom_token`
+      requires both `endpoint` AND a token (non-empty on first save).
+    - Audits as `gold_config_updated` (targetType=gold_config). The
+      `meta` does NOT include the token — only `source`/`endpoint`/
+      `active`/`refreshMinutes`.
+    - Singleton resolution: `findFirst({ orderBy: { id: "asc" } })` →
+      update if exists, else create.
+
+11. **`src/app/api/admin/gold/refresh/route.ts`** (CREATED) — ITEM 28:
+    - POST handler — admin-only. Reads the GoldPriceConfig singleton,
+      resolves the endpoint URL per source:
+      * `custom_json` / `custom_token` — uses `endpoint` (errors 400 if
+        missing). For `custom_token`, decrypts the stored token and sets
+        `Authorization: Bearer <token>` on the request.
+      * `free_talaapi` / `free_tgju` / `free_bonmarket` — uses
+        `endpoint` if provided, else the built-in default URL.
+      * No config row — falls back to `POSTYAR_GOLD_PROVIDER_URL` env
+        (backward compat with the existing `lib/providers/gold/index.ts`).
+    - Fetches with 10s timeout, parses JSON, extracts prices for
+      `18k` / `emami` / `bahar_azadi` / `ounce` using a local
+      `extractPrice()` helper (mirrors the shape-detection A/B/C/D in
+      `lib/providers/gold/index.ts` — kept local because that file's
+      `extractPrice` is private and not in my owned-files list).
+    - For each successfully extracted price, persists a new `GoldPrice`
+      row (append-only for history). Returns
+      `{ ok, fetchedAt, fetchedAtFa, prices: [{ instrument, instrumentFa,
+      priceRials, priceRialsFa, errorFa? }] }`.
+    - Audits as `gold_refreshed` (success) or `gold_refresh_failed`
+      (network/http error). The `meta` includes `source`, `endpoint`,
+      succeeded/total counts — never the token.
+
+12. **`src/components/postyar/admin/gold.tsx`** (rewritten) — ITEM 28:
+    - Two-section layout:
+      (A) `<GoldConfigCard>` — full config UI:
+        * `source` radio group with the 5 specified options
+          (free_talaapi / free_tgju / free_bonmarket / custom_json /
+          custom_token), each with a Persian label + hint.
+        * `endpoint` input (required for custom_*, optional for free_*).
+        * `token` input (password-type, only shown when source ===
+          custom_token; placeholder shows the masked existing token
+          from the GET response).
+        * Collapsible `<details>` "انتخابگرها (پیشرفته — اختیاری)" with
+          4 selector inputs (18k, emami, bahar_azadi, ounce).
+        * `refreshMinutes` number input (1–1440) + `active` Switch.
+        * «نوسازی اکنون» button → `api.adminRefreshGoldPrices()` (POST
+          /api/admin/gold/refresh). On success: toast + invalidates the
+          config query. The response is rendered as a "آخرین قیمت‌های
+          نوسازی‌شده" table with instrument/Persian label/price/status
+          badge (موفق / ناموفق) per row.
+        * «ذخیرهٔ پیکربندی» button → `api.adminUpdateGoldConfig(body)`
+          (POST /api/admin/gold/config). On success: clears the token
+          field (so it shows the masked preview again) + invalidates.
+      (B) The existing gold-bots table — PRESERVED 1:1 (owner, instrument,
+        direction, thresholdPct, enabled, lastFiredAt Jalali) under a
+        separate Card titled «بات‌های طلای کاربران».
+    - Added the comment block:
+      `// NOTE (ITEM 35): این بخش فقط برای مدیر سامانه قابل مشاهده است.`
+      documenting the 3 admin routes (`/api/admin/gold`,
+      `/api/admin/gold/config`, `/api/admin/gold/refresh`) all enforce
+      `requireRole(["admin"])`.
+    - All Persian, RTL, lucide icons only, Persian digits, Jalali dates,
+      loading/error/empty states, `cursor-pointer` +
+      `focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none`
+      on every clickable.
+
+13. **`src/components/postyar/admin/audit.tsx`** + **`src/components/
+    postyar/admin/health.tsx`** (additively commented) — ITEM 35:
+    - Added the comment block to both files:
+      `// NOTE (ITEM 35): این بخش فقط برای مدیر سامانه قابل مشاهده است.`
+      explicitly documenting that the routes (`/api/admin/audit`,
+      `/api/admin/health`) enforce `requireRole(["admin"])` (NOT
+      `["admin","support"]`) — support agents cannot view the audit log
+      or the health dashboard.
+    - VERIFIED: both routes already used `requireRole(["admin"])` (no
+      narrowing needed). The `<AdminGate>` wrapper (defaults to
+      `["admin"]`) already hides the UI from non-admins. The dashboard's
+      menu-gating (which admin menu items to show) is the dashboard
+      agent's concern — but the routes themselves reject non-admins
+      regardless of menu visibility.
+
+14. **`src/app/api/payments/bank/route.ts`** (rewritten POST) — ITEM 41:
+    - `mode` body field is now OPTIONAL (`z.enum(["direct","intermediary"]).optional()`).
+    - The resolved `mode: BankMode = parsed.data.mode ?? "direct"` is
+      used in the lib call + audit. The user no longer picks
+      direct/intermediary — the backend figures it out.
+    - Backward compat: an older client that still sends `{ orderId, mode }`
+      keeps working (the explicit mode is honored).
+    - `requireUser()` (not admin) preserved. Order ownership check,
+      status check, audit `bank_payment_request_created` /
+      `_failed` preserved.
+
+15. **`src/lib/payments/bank.ts`** — NOT MODIFIED. The `BankMode` type
+    stays (used internally for routing direct vs intermediary through the
+    bank API). The lib's `getBankProvider.createPaymentRequest` already
+    defaulted `extras?.mode ?? "direct"`. No UI exposure of `mode`. Item
+    41 satisfied via the API + UI changes alone.
+
+16. **`src/components/postyar/payment/view.tsx`** (edited) — ITEM 41:
+    - Removed the `BANK_MODE_LABELS` const + the `BankGatewaySection`'s
+      `mode` state + the direct/intermediary `<RadioGroup>`.
+    - `BankGatewaySection` now renders just the security `<Alert>` +
+      a single «پرداخت از طریق درگاه» button that calls
+      `api.createBankRequest({ orderId })` (no mode). On success the
+      browser is redirected to the bank's `redirectUrl`.
+    - The outer method selector (`<RadioGroup>` with 3 cards: کارت به
+      کارت / درگاه بانکی / پرداخت با بله) is PRESERVED — only the
+      inner direct/intermediary radio inside the bank section is gone.
+    - File header comment updated to reflect the simplification.
+    - Added `cursor-pointer focus-visible:ring-2` to the bank button.
+
+17. **`src/components/postyar/api.ts`** (additively extended) — shared
+    infra; all changes are backward-compatible:
+    - Added `AdminSettingDef`, `AdminSettingGroup`, `AdminSettingsResponse`
+      types (mirror the GET response shape).
+    - Added `GoldSource`, `AdminGoldConfigRow`, `AdminGoldConfigInput`,
+      `AdminGoldRefreshPrice`, `AdminGoldRefreshResult` types.
+    - Widened `getAdminSettingsTyped` return type from
+      `{ items, allowedKeys }` to `AdminSettingsResponse` (superset —
+      existing callers reading items/allowedKeys still work).
+    - Widened `createBankRequest`'s input — `mode` is now optional:
+      `{ orderId: string; mode?: "direct" | "intermediary" }`.
+    - Added `adminResetUserPassword(id, newPassword)` → POST
+      `/api/admin/users/[id]/reset-password`.
+    - Added `adminBatchUpdateSettings(items)` → PATCH
+      `/api/admin/settings` with `{ items: [{key, value}, ...] }`.
+    - Added `adminResetSetting(key)` → DELETE `/api/admin/settings`
+      with `{ key }` body.
+    - Added `getAdminGoldConfig()` → GET `/api/admin/gold/config`.
+    - Added `adminUpdateGoldConfig(body)` → POST `/api/admin/gold/config`.
+    - Added `adminRefreshGoldPrices()` → POST `/api/admin/gold/refresh`.
+
+### Items confirmed delivered
+
+- **ITEM 28 — Gold price config + refresh**: ✓ Full config UI in
+  `admin/gold.tsx` (5-source radio, endpoint, encrypted-at-rest token,
+  4 selectors, refreshMinutes, active switch). POST `/api/admin/gold/config`
+  saves; POST `/api/admin/gold/refresh` fetches from the configured source
+  and upserts `GoldPrice` rows. «نوسازی اکنون» button + last-fetched
+  prices table. All admin-only.
+- **ITEM 29 — Admin stats Jalali date**: ✓ The API now returns
+  `generatedAtFa: formatJalaliDateTime(new Date(), { withTime: true })`
+  (was a Persian-digitized ISO Gregorian string — bug). Audited all
+  dates in `admin/stats.tsx`; the only displayed date is
+  `data.generatedAtFa` and it's now Jalali. No Gregorian dates leak to
+  the admin UI.
+- **ITEM 30 — Admin change user password**: ✓ «تغییر رمز» button per row
+  (disabled for self). `<ResetPasswordDialog>` with new + confirm inputs
+  (min 8 chars, mismatch error). POST `/api/admin/users/[id]/reset-password`
+  hashes via `hashPassword` (bcryptjs, 12 rounds) and updates
+  `User.passwordHash`. Toast + audit. Self-reset refused server-side
+  with a Persian message; the UI also disables the button for self.
+- **ITEM 35 — Audit/Events admin-only**: ✓ VERIFIED that
+  `/api/admin/audit` and `/api/admin/health` already use
+  `requireRole(["admin"])` (not `["admin","support"]`). Added the
+  Persian comment «این بخش فقط برای مدیر سامانه قابل مشاهده است.»
+  to both UI files. The dashboard's menu-gating is the dashboard agent's
+  concern; the routes reject non-admins regardless.
+- **ITEM 39 — Settings clarity**: ✓ Grouped into 7 Persian-labeled
+  Cards (general / sms_panel / email_panel / bank_gateway / gold_config /
+  ai_config / security). Each setting shows the key in a `<code>` tag +
+  Persian label + description + Input/Select. Per-card «ذخیرهٔ گروه»
+  batch save via PATCH `/api/admin/settings`. Per-key «بازنشانی به
+  پیش‌فرض» via DELETE.
+- **ITEM 40 — SMS/email/gateway settings**: ✓ Settings UI can edit all
+  the env-var-named keys (`POSTYAR_SMS_*`, `POSTYAR_SMTP_*`,
+  `POSTYAR_BANK_*`, `POSTYAR_AI_*`). Added `getSetting(key, fallback)`
+  helper in `src/lib/providers/util.ts` — reads SystemSetting first,
+  then env, then fallback (with a 30s in-process cache). Updated
+  `lib/providers/sms/index.ts` and `lib/providers/email/index.ts` to
+  use `getSetting` — behavior is unchanged when SystemSetting is empty
+  (env-only fallback). `invalidateSettingsCache` called after every
+  settings mutation so provider libs pick up changes immediately.
+  Existing sending is NOT broken.
+- **ITEM 41 — Payment gateway simplification**: ✓ Removed the
+  direct/intermediary radio in `payment/view.tsx`. The user now sees a
+  single «درگاه بانکی» option and a single «پرداخت از طریق درگاه»
+  button. The backend (`/api/payments/bank`) accepts an optional `mode`
+  and defaults to `"direct"` server-side. `lib/payments/bank.ts`
+  untouched — `BankMode` stays internal. The verify callback flow is
+  untouched. Backward compat: an older client that still sends `mode`
+  keeps working.
+
+### Constraints honored (universal)
+
+- All Persian text, RTL (`dir="rtl"` on every section root, Dialog/
+  AlertDialog Content). Vazirmatn via Tailwind 4 base.
+- lucide-react icons ONLY (KeyRoundIcon, Settings2Icon, RefreshCwIcon,
+  SaveIcon, BanknoteIcon, AlertCircleIcon, Loader2Icon, TrendingUpIcon,
+  ShieldIcon, ShieldCheckIcon, SparklesIcon, GlobeIcon, MailIcon,
+  MessageSquareIcon, RotateCcwIcon, SettingsIcon, CreditCardIcon). No
+  emojis anywhere. Verified exports.
+- Persian digits via `toPersianDigits(...)` for counts, page numbers,
+  total pages, refreshMinutes, price previews, percentages, "X از Y
+  پیکربندی‌شده" badges, "X تغییر ذخیره‌نشده" hints.
+- Jalali dates everywhere — `formatJalaliDateTime(..., { withTime: true })`
+  for `generatedAtFa`, `updatedAtFa`, `fetchedAtFa`, `lastFiredAtFa`,
+  `createdAtFa` (already-Jalali from existing admin routes).
+- `cursor-pointer` + `focus-visible:ring-2 focus-visible:ring-ring
+  focus-visible:outline-none` on every custom clickable (buttons,
+  row actions, dialog actions, settings save/reset, gold refresh,
+  radio labels, payment button).
+- Loading skeletons + error states + empty states on every async
+  surface (stats, users, settings, gold bots, gold config, audit,
+  health).
+- Toasts (sonner) for every mutation: settings save/reset, gold config
+  save/refresh, user suspend/unsuspend/role-change/password-reset,
+  payment bank-request create/fail.
+- `requireRole(["admin"])` on all admin routes (`stats/admin`,
+  `admin/users/[id]/reset-password`, `admin/settings` GET/POST/PATCH/
+  DELETE, `admin/gold/config` GET/POST, `admin/gold/refresh` POST).
+  The pre-existing `admin/audit` + `admin/health` routes were verified
+  to already enforce `requireRole(["admin"])` — no narrowing needed.
+- `motion-safe:` not relevant to these changes (no animations added);
+  existing transitions in stats.tsx (growth bars) preserved.
+
+### Verification
+
+- `cd /home/z/my-project && bun run lint` → **EXIT 0, 0 errors, 0
+  warnings.** All my files lint-clean.
+- `cd /home/z/my-project && bunx tsc --noEmit` → **EXIT 0** (zero type
+  errors project-wide, including my files). Filtering
+  `bunx tsc --noEmit 2>&1 | grep -E "admin/stats|admin/users|admin/settings|admin/gold|admin/audit|admin/health|payments/bank|payment/view|providers/util|providers/sms|providers/email|reset-password|api/admin/gold|api/stats/admin|api/admin/settings|api/payments/bank"` →
+  empty (zero hits).
+
+### Stage Summary
+
+- Items 28, 29, 30, 35, 39, 40, 41 fully delivered end-to-end.
+- Lint + tsc clean (EXIT 0 for both, zero errors + zero warnings).
+- No blockers. Ready for the next agent.
+
+---
+
+## Task `revamp2-bankcards` — Bank cards: BluBank + beautiful card (Items 36, 37)
+
+### Scope (files owned + created)
+- **Created** `src/lib/payments/banks.ts` (client-safe bank-metadata module —
+  NO `db` imports, safe for direct import from client components).
+- **Edited** `src/lib/payments/bank-cards.ts`.
+- **Edited** `src/app/api/admin/bank-cards/route.ts` (GET only).
+- **Edited** `src/components/postyar/admin/bank-cards.tsx`.
+- **Edited** `src/components/postyar/payment/view.tsx` (only the
+  `CardToCardSection` + imports + `BeautifulBankCard`; the
+  payment-gateway simplification from Item 41 by the previous agent is
+  preserved — `BankGatewaySection`, `BalePaymentSection`, `MethodCard`,
+  `PlanSummary`, `DiscountValidator`, and the `PaymentView` body are
+  untouched except the single line that now passes `amount` to
+  `CardToCardSection`).
+- **Edited** `src/components/postyar/payment/orders.tsx` (added an
+  explicit `dir="rtl"` on the card-receipt inner block — defensive).
+- Did NOT touch `prisma/schema.prisma`, `dashboard.tsx`, `postyar-app.tsx`,
+  or `api.ts` (other agents' files). No schema changes.
+
+### ITEM 36 — BluBank + manual bank-name entry (✓ delivered)
+
+**`src/lib/payments/banks.ts`** (NEW, client-safe):
+- `export interface BankMeta { name: string; color: string; gradient: string }`
+- `export const BANKS: BankMeta[]` — 16 entries per the task spec:
+  بانک ملت، بانک ملی، بانک صادرات، بانک تجارت، بانک سپه، بانک
+  پاسارگاد، بانک پارسیان، بانک سامان، بانک سرمایه، بانک رفاه، بانک
+  کشاورزی، بانک مسکن، بانک شهر، بانک خاور، **بلو بانک** (brand
+  color `#1a5cff`, blue-ish — per task spec), سایر (neutral slate
+  fallback `#475569`). NO emojis. Each entry has a 3-stop diagonal
+  CSS gradient for the beautiful card display.
+- `export const BANK_NAMES: string[]` — convenience list of names.
+- `export function getBankMeta(name): BankMeta` — returns matching
+  meta or the «سایر» default for unknown names (manual-entry case).
+- `export function isPresetBankName(name): boolean` — used by the
+  admin UI to badge manually-entered banks with «دستی».
+
+**`src/lib/payments/bank-cards.ts`**:
+- Imports + re-exports `BANKS, BANK_NAMES, getBankMeta, isPresetBankName,
+  BankMeta` from `./banks` so this file's public surface still
+  `export { BANKS }` per the task directive. The data itself lives in
+  the client-safe `./banks` module so client components can import
+  directly without pulling in `db`.
+- `ALLOWED_BANKS = BANK_NAMES` kept for backward compat (route.ts
+  still imports it).
+- `addBankCard` now:
+  - Accepts ANY bank name that's 2..40 chars (so manual entry works).
+  - Refuses the literal `«سایر»` sentinel — admin must type a real
+    bank name in the manual field if they picked «سایر (وارد دستی)».
+  - Stores the FULL formatted PAN `1234-5678-9012-3456` in the
+    `cardNumberMask` column (which is just a `String` — no schema
+    change needed) instead of masking it. This is the correct stance
+    for the Iranian card-to-card use case: the merchant's destination
+    PAN IS the published account number customers wire money to. The
+    previous "NEVER store the full PAN" stance was overly restrictive
+    and prevented the user from paying. For partial-input rows
+    (5..15 digits, or exactly 4 digits) we still keep a `****-****-
+    ****-XXXX` mask — we can't reconstruct what wasn't typed.
+- File header comment rewritten to reflect the new storage policy.
+
+**`src/app/api/admin/bank-cards/route.ts`**:
+- GET now returns `{ items, allowedBanks, banks }` where `banks` is the
+  full `BANKS` array (with color + gradient) for any future consumer.
+  The admin UI imports `BANKS` directly from `@/lib/payments/banks`
+  (no round-trip needed) — the response field is a bonus for callers
+  that prefer the API surface.
+- POST untouched (Zod already validates bankName 2..40 chars).
+
+**`src/components/postyar/admin/bank-cards.tsx`** (Item 36 UI):
+- Bank picker is now a **combobox**: a shadcn `Select` listing all
+  preset banks (each item shows a small color swatch matching the
+  bank's brand color via `style={{ background: b.color }}`) PLUS a
+  final `«سایر (وارد دستی)»` option (with a `PencilIcon`).
+  - Selecting «سایر (وارد دستی)» reveals a secondary text `Input`
+    ( maxLength 40 ) below the Select for manual bank-name entry.
+  - `effectiveBankName = useMemo(...)` — when the Select value is
+    the sentinel, the submitted bankName is the manual text;
+    otherwise it's the selected preset name.
+  - Submit is disabled when `effectiveBankName.length < 2`.
+- The table now shows a color swatch next to each row's bank name
+  (via `getBankMeta(c.bankName).color`), and a small «دستی» outline
+  badge for manually-entered banks (via `isPresetBankName`).
+- Table column header renamed from `شماره (ماسک‌شده)` → `شماره کارت`
+  since new rows store the full formatted PAN. (Legacy rows still
+  show their stored masked form — admin can delete + re-add to
+  upgrade.)
+- Card-number `Input` now shows a live `X از ۱۶ رقم` helper via
+  `toPersianDigits`, with `font-mono tracking-wider`.
+- All clickable surfaces carry `cursor-pointer` + `focus-visible:ring-2
+  focus-visible:ring-ring focus-visible:outline-none`.
+- Added a `q.error` branch («بارگذاری کارت‌ها ناموفق بود.»).
+
+### ITEM 37 — Beautiful card-to-card display + copy (✓ delivered)
+
+**`src/components/postyar/payment/view.tsx`** — the existing
+`CardToCardSection` was rewritten (the surrounding `PaymentView`,
+`PlanSummary`, `DiscountValidator`, `BankGatewaySection`,
+`BalePaymentSection`, `MethodCard` are unchanged — the previous
+agent's Item 41 payment-gateway simplification is fully preserved).
+
+- New `<BeautifulBankCard>` component renders each card as a real
+  credit-card visual:
+  - Gradient background via `style={{ background: meta.gradient }}`
+    using the bank's brand color from `getBankMeta(bankName)`.
+  - Bank name top-right (RTL, drop-shadow).
+  - Card holder name bottom-right (RTL).
+  - Card number center, `dir="ltr"` for the digits, formatted as
+    `۱۲۳۴ ۵۶۷۸ ۹۰۱۲ ۳۴۵۶` (Persian-digit groups separated by
+    spaces, via `toPersianDigits`). For legacy masked rows the
+    asterisks are preserved (can't reconstruct what wasn't stored).
+  - `SquareIcon` "chip" in the top corner with an amber gradient.
+  - `motion-safe:transition-transform motion-safe:hover:-translate-y-1
+    motion-safe:hover:shadow-xl` for the hover-lift effect (respects
+    `prefers-reduced-motion`).
+  - `aspect-[1.586]` matches a real credit card's aspect ratio.
+- **Copy button** «کپی شماره» (lucide `CopyIcon`): on click, calls
+  `copyCardNumber(card)` which:
+  1. Strips non-digits from `card.cardNumberMask` → the raw 16-digit PAN.
+  2. Tries `navigator.clipboard.writeText(digits)` (HTTPS / secure
+     context).
+  3. Falls back to a hidden `textarea` + `document.execCommand("copy")`
+     for older browsers / non-secure contexts.
+  4. Toast «شماره کارت کپی شد.» (sonner) on success;
+     «کپی ناموفق بود…» on failure.
+  5. Briefly swaps the button label to «کپی شد» + `CheckIcon` for 1.5s
+     so the user sees confirmation.
+- **Amount to pay** box: `formatRials(amount)` (big, bold, Persian
+  digits + «ریال» suffix, `tabular-nums`). The `amount` prop is
+  `effectiveAmount` from `PaymentView` (discount applied) — passed
+  down via `<CardToCardSection orderId amount={effectiveAmount}
+  navigate />`.
+- **Upload receipt** flow preserved: `<Input type="file" accept="image/*">`
+  + `<Button>بارگذاری رسید</Button>` (label renamed from «ثبت فیش»
+  per task spec, but the underlying `api.uploadMedia(file,"image")`
+  → `api.uploadReceipt({orderId, mediaId})` flow is untouched). Toasts
+  preserved.
+- Error state: a `destructive` `Alert` if `cards.error` («بارگذاری
+  ناموفق»). Loading state: `Skeleton` placeholders. Empty state:
+  «کارت مقصدی توسط مدیر سامانه تنظیم نشده است.» preserved.
+- All clickable surfaces carry `cursor-pointer` + `focus-visible:ring-2
+  focus-visible:ring-ring focus-visible:outline-none`.
+
+**`src/components/postyar/payment/orders.tsx`**:
+- The card-receipt block in `ExpandedDetail` already inherits RTL
+  from the parent `<div dir="rtl">`, but I added an explicit
+  `dir="rtl"` on the inner `cardReceipt` div for defense-in-depth in
+  case the block is ever moved. No other changes — the table is
+  already RTL.
+
+### Why no new `GET /api/payments/card/[orderId]` endpoint?
+
+The task directive said: "if only masked is stored, add a `GET
+/api/payments/card/[orderId]` that returns the full number for the
+assigned card." After auditing `lib/payments/bank-cards.ts` +
+`api/payments/card/route.ts`, I confirmed the full PAN was NOT
+stored at all (the original code masked it before storage, by
+design — "NEVER store the full PAN"). Recovering a never-stored PAN
+is impossible, so the only way to make the full number visible to
+the user was to change the storage policy. I changed `addBankCard`
+to store the FULL formatted PAN in the existing `cardNumberMask`
+String column (no schema change). After this change, the EXISTING
+`GET /api/payments/card` endpoint already returns the full PAN (via
+`listBankCards()`), so the conditional "if only masked is stored"
+is FALSE — no new endpoint was needed. This is documented above.
+(If a per-order endpoint is wanted later, it's a 10-line wrapper —
+but it would return the same data the existing endpoint already
+returns, since orders don't have a per-order `assignedBankCardId`
+field; all active cards are shared across all card-to-card orders.)
+
+### Constraints honored (universal)
+
+- All Persian text, RTL (`dir="rtl"` on every section root, Dialog/
+  AlertDialog Content, the beautiful card root, the card-receipt
+  block). Vazirmatn via Tailwind 4 base.
+- lucide-react icons ONLY (CreditCardIcon, Loader2Icon, PencilIcon,
+  PlusIcon, SaveIcon, Trash2Icon, CheckIcon, CopyIcon, SquareIcon,
+  UploadIcon, AlertCircleIcon, BanknoteIcon, CheckCircle2Icon,
+  ExternalLinkIcon, ReceiptIcon, ShieldCheckIcon, WalletIcon,
+  ArrowLeftIcon). No emojis anywhere. Verified exports.
+- Persian digits via `toPersianDigits(...)` for the card number
+  groups, the "X از Y رقم" helper, file-size KB, and the table
+  count badge.
+- Jalali dates preserved (`formatJalaliDate` for the admin table's
+  `ساخته‌شده` column; `formatJalaliDateTime` for the orders'
+  `بررسی‌شده در` field).
+- `cursor-pointer` + `focus-visible:ring-2 focus-visible:ring-ring
+  focus-visible:outline-none` on every custom clickable (admin
+  buttons, combobox trigger, dialog buttons, alert-dialog actions,
+  copy button, upload button).
+- Loading skeletons + error states + empty states on every async
+  surface (admin table, payment card list).
+- Toasts (sonner) for every mutation: card add/delete/toggle,
+  receipt upload, copy success/failure.
+- `motion-safe:` used for the hover-lift effect on the beautiful
+  card (respects `prefers-reduced-motion`).
+- `requireRole(["admin"])` on `api/admin/bank-cards` GET/POST/PATCH/
+  DELETE (already enforced — untouched). `requireUser()` on
+  `api/payments/card` GET (already enforced — untouched).
+
+### Verification
+
+- `cd /home/z/my-project && bun run lint` → **EXIT 0, 0 errors, 0
+  warnings.** All my files lint-clean.
+- `cd /home/z/my-project && bunx tsc --noEmit` → **EXIT 0** (zero
+  type errors project-wide). Filtering
+  `bunx tsc --noEmit 2>&1 | grep -E "bank-cards|payment/view|payment/orders|payments/bank-cards|payments/card|payments/banks"` →
+  empty (zero hits).
+
+### Items confirmed delivered
+
+- **ITEM 36 — BluBank + manual entry**: ✓ BluBank (`#1a5cff`) added
+  to BANKS. Combobox in `admin/bank-cards.tsx` lists all 15 preset
+  banks + «سایر (وارد دستی)» which reveals a text input. Bank
+  brand color shown as a swatch in both the picker and the table.
+  Manual-entry banks badged «دستی». `bankName` validated 2..40
+  chars server-side; the «سایر» sentinel is refused (admin must
+  type a real name).
+- **ITEM 37 — Beautiful card + copy**: ✓ `<BeautifulBankCard>`
+  renders each card as a gradient credit-card visual (bank brand
+  color, holder name, Persian-digit card number with `dir="ltr"`,
+  chip icon, motion-safe hover lift). Copy button uses
+  `navigator.clipboard.writeText` with `execCommand` fallback; toasts
+  «شماره کارت کپی شد.» on success. Amount-to-pay box with
+  `formatRials(amount)` (Persian digits + «ریال»). Existing receipt
+  upload flow untouched. Storage policy changed so the full PAN is
+  stored in `cardNumberMask` for new cards (legacy rows still masked
+  — admin can delete + re-add to upgrade).
+
+### Stage Summary
+
+- Items 36 + 37 fully delivered end-to-end.
+- Lint + tsc clean (EXIT 0 for both, zero errors + zero warnings).
+- No schema changes, no breaking changes to other agents' files.
+- No blockers. Ready for the next agent.
+
+---
+
+## Task `revamp2-orders-wallet` — Items 10, 11, 13, 38 (orders manual review + wallet/plans checkout)
+
+### Scope
+
+Owned files (only these were edited/created):
+- `src/app/api/orders/route.ts` (READ ONLY — already supported `kind: "wallet_credit"` + `amount` + `provider`, no fix needed)
+- `src/app/api/orders/[id]/route.ts` (READ ONLY — already allows admin to read any order)
+- `src/app/api/admin/orders/route.ts` (**CREATED** — full admin list with filters + pagination + Jalali date-range parsing)
+- `src/app/api/admin/orders/[id]/approve/route.ts` (**REWRITTEN** — generic, idempotent, fulfills any order kind via `activateSubscription`)
+- `src/app/api/admin/orders/[id]/reject/route.ts` (**REWRITTEN** — generic, stores reason in `metadata` JSON, idempotent for already-rejected)
+- `src/components/postyar/payment/orders.tsx` (READ ONLY — already correct, RTL preserved)
+- `src/components/postyar/payment/view.tsx` (READ ONLY — gateway simplification + bank card display from prior agents untouched)
+- `src/components/postyar/payment/plans.tsx` (**EXTENDED** — added «تسویه‌حساب (بدون پلن)» Card with amount + provider + inline payment flows)
+- `src/components/postyar/wallet/view.tsx` (**EXTENDED** — «شارژ کیف پول» button now shows a Persian toast before navigating to `/dashboard/plans`)
+- `src/components/postyar/wallet/ledger.tsx` (READ ONLY — not touched)
+- `src/lib/payments/engine.ts` (READ ONLY — interface only)
+- `src/components/postyar/admin/orders-review.tsx` (**CREATED** — full admin order-review UI with filters, table, pagination, detail Dialog, approve/reject dialogs)
+- `src/components/postyar/api.ts` (**EXTENDED** — added `AdminOrdersQuery` type, expanded `AdminOrderRow` type, rewrote `getAdminOrdersTyped` to accept filters and return paginated `{ orders, items, total, page, pageSize }` with backward-compat `items` alias; widened `adminApproveOrder` return type + `adminRejectOrder` signature to accept `reason`)
+
+Did NOT touch: `dashboard.tsx`, `postyar-app.tsx`, `prisma/schema.prisma`, the existing `admin/orders.tsx` (left for the dashboard agent to choose between `orders.tsx` and the new `orders-review.tsx`).
+
+### Item 10 — Manual approve / reject orders (generic)
+
+**`src/app/api/admin/orders/[id]/approve/route.ts`** — rewritten:
+- `requireRole(["admin"])` enforced.
+- Loads the order with `cardReceipt`, `bankRef`, `baleRef`, and user snapshot.
+- **Idempotent**: if `status === "paid"` → returns `{ ok: true, idempotent: true, paidRials }` without re-running fulfillment (no double LedgerEntry / WalletTxn / Subscription).
+- **Refuses** if `status === "rejected"` (admin must revert manually).
+- **Card path**: when `cardReceipt` exists, delegates to the existing `adminApproveCardOrder` helper in `lib/payments/card.ts` (which itself calls `activateSubscription` under a $transaction with deterministic idempotency keys + marks the receipt `approved` + notifies + audits).
+- **Non-card path** (bank/bale/manual): calls `activateSubscription` directly with the deterministic idempotency key `admin:approve:<orderId>`. The helper atomically:
+  1. Conditionally `updateMany` on `Order.status in [pending, awaiting_payment, awaiting_review]` → `paid` (so a retry returns 0 affected rows = no-op).
+  2. `upsert` on `LedgerEntry` keyed by `ledger:payment:<id>`.
+  3. `upsert` on `WalletTxn` keyed by `wallet:payment:<id>` (computes `balanceAfter` from the running total of prior txns).
+  4. Activates the `Subscription` when `kind === "subscription"` (and `planId` resolves) — extends by `plan.intervalMonths`, dedups against existing subs.
+  5. Applies the one-time referral reward (`ReferralReward` + `WalletTxn` + `LedgerEntry` idempotency keys) for the FIRST paid order by a referred user.
+- Appends admin `notes` (if provided) into the `metadata` JSON column under `adminNotes[]` (per-event entry: `{ at, by, notes }`) — does not clobber existing metadata keys.
+- Notifies the user (per kind: «اشتراک شما فعال شد» for subscription, «مبلغ به کیف پول شما افزوده شد» for wallet_credit) and audits under `order_approve`.
+- Returns `{ ok, paidRials, orderId, status, subscriptionId? }`.
+
+**`src/app/api/admin/orders/[id]/reject/route.ts`** — rewritten:
+- `requireRole(["admin"])` enforced.
+- Body schema accepts `{ reason?, notes? }` — `reason` is preferred; `notes` is a legacy alias for backward-compat.
+- **Refuses** if `status === "paid"` (cannot undo fulfillment).
+- **Idempotent for already-rejected orders**: just updates the reason if a new reason is provided (no duplicate notification/audit).
+- Persists rejection details in the `metadata` JSON column:
+  - `rejectionReason`: the latest reason (quick-access for UI).
+  - `rejections`: append-only array of `{ at, by, reason }` events.
+- Marks the `CardTransferReceipt` `rejected` with `reviewedBy`, `reviewedAt`, `adminNotes=reason` when present.
+- Notifies the user (Persian, with reason inline) and audits under `order_reject` only on the first rejection.
+
+### Item 38 — Full orders indexing
+
+**`src/app/api/admin/orders/route.ts`** — created:
+- `requireRole(["admin"])` enforced.
+- Server-side filters via query params:
+  - `?status=` — exact match.
+  - `?kind=` — exact match.
+  - `?provider=` — exact match.
+  - `?q=` — free-text `OR` of `{ id: contains }` + `{ user: { email: contains } }` + `{ user: { mobile: contains } }` (Prisma `mode: "insensitive"` not needed for SQLite — `contains` is already case-insensitive).
+  - `?from=` and `?to=` — Jalali date strings (`YYYY-MM-DD` or `YYYY/MM/DD`, Persian digits accepted via `fromPersianDigits`) → parsed to UTC ISO via `jalaliToUtcIso(jy,jm,jd,hour,min)` (Tehran TZ). `from` = start-of-day 00:00; `to` = end-of-day 23:59:59.999 inclusive. Combined with any existing `createdAt` filter into a single `{ gte, lte }` clause.
+  - `?page=` and `?pageSize=` (clamped to [1..100], default 20).
+- Prisma `where` built as `{ AND: [...] }` clauses.
+- Returns `{ orders: [...], total, page, pageSize }` where each row carries: `id, userId, userEmail, userMobile, userFullName, kind, kindFa, amountRials, amountFa, status, statusFa, provider, providerFa, planId, descriptionFa, createdAt (ISO), createdAtFa (Jalali), updatedAt, hasCardReceipt, receiptStatus, receiptReviewedAt`.
+- Includes the `cardReceipt` summary (id/status/reviewedAt/adminNotes) so the UI can show whether a receipt is awaiting review without a second round-trip.
+- 200 on success, 401/403 via `requireRole`, 500 on internal error — all return Persian `errorFa`.
+
+### Item 10 (UI) — `src/components/postyar/admin/orders-review.tsx`
+
+New admin order-review view (default-exported as `AdminOrdersReviewView`, wrapped in `AdminGate`):
+- **Filter bar** (`<Card>`): search input (email/mobile/order id), `<Select>` for status, kind, provider, two Jalali date inputs (`from`/`to`) with inline validation (`YYYY-MM-DD`), «پاک کردن فیلترها» button, total-count display. Date validation gates the query (`enabled: datesValid`).
+- **Paginated table**: columns = سفارش (short id), کاربر (name + email + mobile), نوع (Persian label), مبلغ (`formatRials` + Persian digits), پروایدر (Persian label + icon), وضعیت (`StatusBadge` with tone: emerald for paid, amber for awaiting_review, destructive for rejected/failed), تاریخ (`formatJalaliDateTime` with `withTime: true`). Each row carries «مشاهده» / «تأیید» / «رد» actions.
+- **shadcn `<Pagination>`** with previous/next + page indicator (Persian digits).
+- **Detail Dialog**: full order info grid + card receipt summary + bank/bale refs + timeline (`<ClockIcon>` ordered list) + admin notes `<Textarea>` (max 500 chars, with Persian-digit char counter) + inline «تأیید دستی» / «رد سفارش» buttons.
+- **Reject Dialog**: separate `<Dialog>` with reason `<Textarea>` (max 500 chars) + char counter; calls `api.adminRejectOrder(id, reason)`.
+- Approve mutation: `api.adminApproveOrder(id, adminNotes)` → invalidates `["admin","orders-review"]` + `["orders","detail",<id>]` query caches on success; toast on success/error.
+- Reject mutation: `api.adminRejectOrder(id, reason)` → invalidates list cache; toast on success/error.
+- Loading skeleton, error `Alert`, empty state with hint text on every async surface.
+- All clickables carry `cursor-pointer` + `focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none`.
+
+### Item 11 — Wallet charge → plans
+
+**`src/components/postyar/wallet/view.tsx`** — `BalanceCard`'s «شارژ کیف پول» button now wraps the existing `navigate("/dashboard/plans")` call with a `toast.success("برای شارژ کیف پول، یک پلن یا بستهٔ اعتباری انتخاب کنید.")` first. Balance display, ledger link, and history table untouched. Added `cursor-pointer` + `focus-visible:ring-2` to all three BalanceCard buttons.
+
+### Item 13 — Checkout without plan
+
+**`src/components/postyar/payment/plans.tsx`** — added a new `<NoPlanCheckout>` Card above the plan grid:
+- **Amount input** (`<Input>` with `inputMode="numeric"`, `dir="ltr"`, Persian-digit entry accepted; server-side `createWalletCreditOrder` enforces ≥ 100,000 rials — UI mirrors that min and shows live `formatRials(amountRials)` preview + validation message when below min).
+- **Provider radio** (`<RadioGroup>` with three `<label>`-wrapping cards: کارت به کارت / درگاه بانکی / پرداخت با بله — same icons as the existing `view.tsx` for visual consistency).
+- **Submit** → `api.createOrder({ kind: "wallet_credit", amount, provider, idempotencyKey: "wallet:noplan:"+randomToken(12) })`. The existing `/api/orders` POST handler already supports this body shape (the route's `BodySchema.refine` requires `amount` for non-subscription kinds, no `planId` needed) — **no server-side fix was needed**.
+- After successful creation, the Card flips to render the appropriate payment-flow inline:
+  - `<NoPlanCardFlow>`: destination bank cards (`api.getBankCards()`) + amount-to-pay box + file upload (`api.uploadMedia`) + `api.uploadReceipt({ orderId, mediaId })` → toast + navigate to `/dashboard/orders`.
+  - `<NoPlanBankFlow>`: `api.createBankRequest({ orderId })` → `window.location.href = redirectUrl`.
+  - `<NoPlanBaleFlow>`: bale bot `<select>` + chatId `<Input>` → `api.createBaleRequest({ orderId, botId, chatId })` → show invoice URL via `<a target="_blank">`.
+- «بازگشت به فرم» button resets the form state to allow another no-plan checkout.
+- Plan grid + footer note left intact; only added the new Card above the grid and a one-line footer hint about the no-plan flow.
+
+### Shared client API (`src/components/postyar/api.ts`)
+
+- New exported type `AdminOrdersQuery = { page?, pageSize?, status?, kind?, provider?, q?, from?, to? }`.
+- `AdminOrderRow` widened (additive only — kept all original fields): added `userMobile?, statusFa?, planId?, updatedAt?, hasCardReceipt?, receiptStatus?, receiptReviewedAt?`.
+- `getAdminOrdersTyped(params?: AdminOrdersQuery)` rewritten: builds a `URLSearchParams` query, calls `/api/admin/orders?...`, returns `{ orders, items, total, page, pageSize }`. The `items` field is a backward-compat alias of `orders` so the existing legacy `admin/orders.tsx` that reads `data?.items ?? []` keeps working unchanged. Errors are swallowed and an empty result is returned (preserves the legacy best-effort contract).
+- `adminApproveOrder(id, notes?)` return type widened to `{ ok, paidRials?, orderId?, status? }` (so the new UI can read the fulfilled state).
+- `adminRejectOrder(id, reason?)` signature: `notes` → `reason` (preferred); the body is `{ reason }` so the new server route reads `parsed.data.reason`. The server route still accepts `notes` as a legacy alias for backward-compat.
+
+### Constraints honored (universal)
+
+- All Persian text, RTL (`dir="rtl"` on every section root, Dialog/DialogContent, the no-plan Card, the detail Dialog body, the timeline, etc.).
+- Vazirmatn via Tailwind 4 base (untouched).
+- lucide-react icons ONLY (`AlertCircleIcon, ArrowDownLeftIcon, ArrowUpRightIcon, BanknoteIcon, CalendarIcon, CheckIcon, ChevronLeftIcon, ClockIcon, CreditCardIcon, EyeIcon, ExternalLinkIcon, FilterIcon, InfoIcon, ListOrderedIcon, Loader2Icon, PlusIcon, ReceiptIcon, RefreshCwIcon, SearchIcon, ShieldCheckIcon, SparklesIcon, UploadIcon, WalletIcon, XIcon, ZapIcon`). Verified exports.
+- Persian digits via `toPersianDigits(...)` for: amounts, page/pageSize numbers, char counters, file size KB, totals.
+- Jalali dates via `formatJalaliDateTime(...)` for `createdAt`, `updatedAt`, receipt reviewedAt, bank/bale paidAt, timeline events.
+- Toasts (sonner) for every mutation: approve, reject, no-plan order create, bank gateway redirect, bale invoice, receipt upload, wallet-charge-navigate.
+- Loading skeletons + error `Alert`s + empty states on every async surface (orders list, bank cards list, bale bots list, order detail Dialog).
+- `cursor-pointer` + `focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none` on every custom clickable (filter Selects, buttons, links, Pagination previous/next, labels wrapping RadioGroupItem).
+- `requireRole(["admin"])` on `/api/admin/orders` GET + `/api/admin/orders/[id]/approve` POST + `/api/admin/orders/[id]/reject` POST — all enforced.
+
+### Idempotency / atomicity guarantees
+
+- **Approve**: if `status === "paid"` → returns success without re-running `activateSubscription`. `activateSubscription` uses `tx.order.updateMany` with `status in [pending, awaiting_payment, awaiting_review]` so a retry inside the $transaction returns 0 affected rows = no-op for the WalletTxn/LedgerEntry/Subscription/ReferralReward `upsert`s that follow. The card path uses `adminApproveCardOrder` which itself uses a deterministic `card:approve:<id>` idempotency key for the receipt update + the same `activateSubscription` call. The non-card path uses `admin:approve:<orderId>` for `activateSubscription`.
+- **Reject**: refuses paid orders; if already rejected, just updates the `rejectionReason` in metadata (no duplicate notification/audit). Receipt update is also idempotent because the `cardTransferReceipt` row is unique per `orderId`.
+
+### Verification
+
+- `cd /home/z/my-project && bun run lint` → **EXIT 0** (zero errors, zero warnings).
+- `cd /home/z/my-project && bunx tsc --noEmit` → **EXIT 0** (zero type errors project-wide). Filtering `bunx tsc --noEmit 2>&1 | grep -E "orders|payment|wallet|orders-review"` → empty (zero hits in my files).
+
+### Items confirmed delivered
+
+- **ITEM 10 — Manual approve / reject orders**: ✓ Generic approve/reject admin routes (rewrite) + new `admin/orders-review.tsx` UI with filterable/paginated table, detail Dialog, approve + reject-with-reason Dialogs. `requireRole(["admin"])` enforced on both routes. Approve is idempotent. Reject stores reason in `metadata.rejectionReason` + appends to `metadata.rejections[]`.
+- **ITEM 11 — Wallet charge → plans**: ✓ `wallet/view.tsx` «شارژ کیف پول» button shows a Persian toast («برای شارژ کیف پول، یک پلن یا بستهٔ اعتباری انتخاب کنید.») before navigating to `/dashboard/plans` (verified the actual dashboard nav route via `dashboard.tsx`'s `case "plans":` switch + NAV entry `{ view: "plans", ... }`). Balance display + ledger link untouched.
+- **ITEM 13 — Checkout without plan**: ✓ New `NoPlanCheckout` Card in `plans.tsx` with Persian-digit amount input + provider radio + submit → POST `/api/orders` with `kind: "wallet_credit"`, `amount`, `provider`, NO `planId`. Inline payment flows (card receipt upload / bank redirect / bale invoice) rendered after order creation. Verified the existing `/api/orders` POST handler already supported this body shape — no server-side fix was needed.
+- **ITEM 38 — Full orders indexing**: ✓ `GET /api/admin/orders` with `?status=, ?kind=, ?provider=, ?q=, ?from=, ?to=, ?page=, ?pageSize=`. Prisma `where` with `AND` clauses + `contains` for `q` + `gte`/`lte` on `createdAt`. Jalali date-range parsed with `src/lib/persian` (`fromPersianDigits` + `jalaliToUtcIso`). Returns `{ orders, total, page, pageSize }`. UI shows total count + shadcn `<Pagination>`.
+
+### Stage summary
+
+- Items 10 + 11 + 13 + 38 fully delivered end-to-end.
+- Lint + tsc clean (EXIT 0 for both).
+- No schema changes (`prisma/schema.prisma` untouched).
+- No breaking changes to other agents' files:
+  - `payment/view.tsx` (gateway simplification + bank card display from prior agents) untouched.
+  - `payment/orders.tsx` untouched.
+  - `wallet/ledger.tsx` untouched.
+  - `lib/payments/card.ts` untouched (the card-specific `adminApproveCardOrder` / `adminRejectCardOrder` helpers are reused as-is).
+  - `lib/payments/plans.ts` untouched (`activateSubscription` is reused as-is).
+  - `admin/orders.tsx` (legacy admin orders view) untouched — its `api.getAdminOrdersTyped()` call still works because the new return shape includes `items` as a backward-compat alias and the call signature is `params?: AdminOrdersQuery` (optional).
+- No blockers. Ready for the next agent.
+
+## Task `revamp2-withoutbot-notif` — Items 12/20, 21, 22, 23, 26, 14, 19
+
+### Approach summary
+
+All five "without-X" items use the same pattern: the view's prop becomes
+optional (`botId?: string`, `destinationId?: string`), and when it is
+omitted the view switches into a "unified / library" mode that aggregates
+the user's existing bots/destinations + a client-side **template/preset
+section** for truly bot-less/destination-less items. The Prisma schema is
+untouched; bot-less rows would have required either a "template pseudo-bot"
+row in `Bot` (which would have polluted `bot/list.tsx`, owned by another
+agent) or a schema migration (forbidden). The chosen approach keeps
+bot-less templates in `localStorage` and uses the existing per-bot /
+per-destination REST endpoints unchanged when the user picks a real target.
+A tiny dashboard.tsx routing tweak (`cleanParam || undefined`) makes the
+without-bot/destination entry points reachable; the rest of dashboard.tsx
+is unchanged.
+
+### Item 14 — Referral count
+
+**`src/lib/payments/referral.ts`** — `getMyReferralStats(userId)`:
+- Added `referredCount: number` = `db.user.count({ where: { referredById: userId } })` — counts ALL referred users regardless of reward status.
+- `referred[]` extended with `fullName` (firstName + " " + lastName), `status` ("active"|"suspended"…), `rewardStatus` ("paid"|null), and `rewardCreatedAt` (ISO when reward paid, else null).
+- Lists the 50 most-recent referred users (`User.findMany` ordered by `createdAt desc`), joined with the existing paid-`ReferralReward` rows.
+- Backward-compat: kept `totalReferrals` (paid rewards count) and all original fields on the items.
+- Added a new exported interface `ReferralReferredItem` for the extended item shape.
+
+**`src/app/api/referral/route.ts`** — unchanged (already returns `stats + policyFa`).
+
+**`src/components/postyar/referral/view.tsx`** — rewritten:
+- Defines a local `ReferralStatsExtended` type (since `api.ts`'s `ReferralStatsRow` is owned by another agent and shouldn't be widened). Uses a local `fetch("/api/referral")` instead of `api.getReferralStats()` so the new fields type-check.
+- Prominent banner Card at the top: «تعداد زیرمجموعه‌ها: N نفر» (Persian digits) + side panel with paid-referral count + total reward.
+- `StatsRow` shows «تعداد زیرمجموعه‌ها» + «مجموع پاداش‌ها».
+- `ReferredList` shows each referral as name + Jalali signup date + status badge (active=فعال / suspended=معلق) + reward badge (paid → amount, else «بدون پاداش»).
+- All copy/refresh button surfaces carry `cursor-pointer` + `focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none`.
+
+### Item 19 — Segmented notifications
+
+**`src/lib/notifications/index.ts`** — added:
+- `type AudienceType = "all" | "single" | "plan" | "plans" | "support"`.
+- `interface SegmentedBroadcastInput { audienceType; audienceMeta: { userId?; planId?; planIds? }; category?; titleFa; bodyFa; link?; adminId }`.
+- `resolveBroadcastAudience(input)` — pure audience resolver returning a `userIds[]`. `single` requires `meta.userId`; `plan` looks up active subs for `meta.planId`; `plans` unions active subs for `meta.planIds[]`; `support` filters `role in ["support","admin"]`; all limited to `status: "active"`. Capped at 10 000 rows.
+- `adminSegmentedBroadcast(input)` — fans out one `Notification` row per recipient in batches of 200 (each batch inside a `db.$transaction`), then persists a `BroadcastNotification` row carrying `category`, `titleFa`, `bodyFa`, `link`, `audienceType`, `audienceMeta` (JSON), `sentById`, `sentAt`, `recipientCount`. Audits `broadcast_sent` with audience metadata. Returns `{ sent, recipientCount, broadcastId }`.
+- Kept `adminBroadcast(input: AdminBroadcastInput)` as a `@deprecated` legacy wrapper that translates the old `filter: "all"|"plan:xxx"|"role:user"` shape into the new segmented form (so `api.adminBroadcast` in api.ts still works unchanged).
+
+**`src/app/api/admin/notifications/broadcast/route.ts`** — rewritten:
+- Accepts BOTH the new segmented body `{ audienceType, audienceMeta, category?, titleFa, bodyFa, link? }` and the legacy `{ filter, titleFa, bodyFa, link? }`.
+- `SegmentedSchema` (zod) validates audienceType enum + audienceMeta object; cross-checks that the right meta field is set for the chosen audienceType (`single`→userId, `plan`→planId, `plans`→non-empty planIds[]).
+- `LegacySchema` (zod) validates the old `filter` shape for backward compat.
+- Returns `{ ok, sent, recipientCount?, broadcastId? }` for segmented; `{ ok, sent }` for legacy.
+- `requireRole(["admin"])` enforced; `clientIp(req)` captured for audit.
+
+**`src/components/postyar/admin/broadcast.tsx`** — rewritten (wrapped in `AdminGate` as before):
+- Audience `<Select>` with 5 options: «همه کاربران» / «یک کاربر» / «کاربران یک اشتراک» / «کاربران چند اشتراک» / «همکاران».
+- Category `<Select>` (system/publish/payment/subscription/referral/ad/ticket/gold/woo/security).
+- For `single`: email/mobile search input → debounced `api.getAdminUsersTyped({ search })` → result list → click to select. Selected user shown with green check + role badge + remove button.
+- For `plan`: `<Select>` of plans from `api.getAdminPlansTyped()` (fetched lazily when audienceType is `plan` or `plans`).
+- For `plans`: multi-select chip toggle; count shown.
+- For `support`: an `<Alert>` explaining the audience (support+admin roles).
+- Title (max 200) + body (max 2000, with Persian-digit char counter) + optional link.
+- Submit → local `fetch("/api/admin/notifications/broadcast", { method: POST, body: JSON.stringify({ audienceType, audienceMeta, category, titleFa, bodyFa, link }) })`. Toast `«اعلان برای N کاربر ارسال شد»` on success; toast on error. Shows last-result inline (recipient count + broadcastId short suffix).
+- Loading skeletons + empty states on every async surface. `cursor-pointer` + `focus-visible:ring-2` on every custom clickable.
+
+### Item 12/20 — Workflow without bot
+
+**`src/components/postyar/bot/workflow.tsx`** — rewritten:
+- `BotWorkflowViewProps.botId?: string` (optional). When omitted: fetches `api.getBotsFull()` then `api.getBotWorkflows(b.id)` for each bot in parallel (a unified `useQuery` keyed on the bots list). Renders a unified list of `WorkflowEditorCard` with a `<Badge>` showing the bot name + provider. A bot-filter `<Select>` lets the user narrow to one bot. When `botId` is provided: existing single-bot flow.
+- New **templates section** (`localStorage` key `postyar:bot-workflow-templates`) for truly bot-less workflows. `WorkflowTemplate` interface with the same fields as `WorkflowRow` minus `botId`. `TemplateEditorCard` reuses the same sortable-step editor UI as `WorkflowEditorCard` but persists to localStorage. A «انتقال به بات» panel inside each template lets the user pick a target bot and `api.createBotWorkflow(targetId, { name, steps, triggerKind, triggerValue })` copies the template to a real `BotWorkflow` row. The Prisma schema's `BotWorkflow.botId` non-nullable constraint is respected — no pseudo-bot row is created.
+- New-workflow dialog: when `botId` is undefined, shows a target-bot `<Select>` (with a "قالب بدون بات" option) before submit. When `botId` is defined, existing single-bot flow.
+- Empty states: when no botId and no bots, shows a "ابتدا یک بات بسازید" hint + a "ساخت قالب بدون بات" CTA.
+- Sortable step editor (`@dnd-kit/sortable`), step types (start/message/condition/action/end), condition kinds (subscription_active/plan/referral/keyword/order_status/provider_context/user_state), action kinds (send_message/show_menu/create_ticket/show_subscription/show_wallet/initiate_payment/show_gold/invoke_ai/show_order/send_content/create_notification), and the flow diagram are all unchanged.
+
+### Item 21 — Link codes without bot
+
+**`src/components/postyar/bot/link.tsx`** — rewritten:
+- `BotLinkViewProps.botId?: string` (optional). When omitted: fetches `api.getBotsFull()` then `api.getLinkCodes(b.id)` for each bot in parallel. Renders a unified `<Table>` with a new «بات» column showing bot name + provider badge. When `botId` is defined: existing single-bot flow.
+- New **personal-codes section** (localStorage key `postyar:bot-link-personal-codes`) for short referral-style codes that are not tied to a bot. `PersonalLinkCode` interface: `{ id, code, createdAt, claimed, claimedAt, note }`. Code generated as `POSTYAR-XXXXXX` (6 alphanumerics, no easy-to-confuse chars). User can copy code, copy `/start <code>`, toggle "claimed" status, delete. The claim handshake (cross-bot lookup) is a follow-up — the personal code is, at minimum, a copyable, revocable short string the user can share in social media.
+- Issued-code result panel (one-time display) kept intact.
+- «تولید کد اتصال» button: when `botId` is defined, calls `api.generateLinkCode(botId)` immediately. When `botId` is undefined, opens a dialog with a target-bot `<Select>`; user picks a bot, then `api.generateLinkCode(targetId)` is called.
+- Loading/empty/error states on every async surface. `cursor-pointer` + `focus-visible:ring-2` on every custom clickable.
+
+### Item 22 — Bot history without bot
+
+**`src/components/postyar/bot/history.tsx`** — rewritten:
+- `BotHistoryViewProps.botId?: string` (optional). When omitted: fetches `api.getBotsFull()` then `api.getBotHistory(b.id, { page: 1, pageSize: 50, direction })` for each bot in parallel. Combines + sorts by `createdAt desc`. Renders a unified `<Table>` with a «بات» column. A bot-filter `<Select>` narrows the view; direction `<Select>` and text-search `<Input>` filter client-side. When `botId` is defined: existing single-bot paginated flow.
+- If user has NO bots and `botId` is undefined, the view loads and renders an empty state with «ساخت بات» CTA → `navigate("/dashboard/bots")` (per the task: "the history view loads and renders").
+- Pagination: for the unified mode, client-side pagination over the combined filtered set (page size 25). For the single-bot mode, server-side pagination unchanged.
+- All copy unchanged from the original (Persian, RTL, lucide icons, Persian digits, Jalali timestamps).
+
+### Item 23 — Broadcast without bot
+
+**`src/app/api/destinations/broadcast/route.ts`** — NEW file:
+- `POST /api/destinations/broadcast` accepts `{ message, destinationIds: string[] }` (zod-validated, max 100 destinations).
+- Resolves destinations in one `db.destination.findMany({ where: { id: { in: destinationIds }, ownerId: user.id, status: { not: "deleted" } } })` (ownership-enforced).
+- For each destination: decrypts `botTokenEnc`, calls `provider.publishMessage({ botToken, chatId, text: message })`. Rate-limited to 5 messages/sec per user (vs the bot-scoped route's 10/sec — destinations are channel messages which are more likely to hit provider throttling). On failure, persists `lastError` + `lastCheckedAt` so the destination-list UI can surface it.
+- Audits `destination_broadcast` with `{ sent, failed, destinationCount, messagePreview, at }`.
+- Returns `{ ok, sent, failed, failures: Array<{ destinationId, label, errorFa }> }` (capped at 50).
+
+**`src/components/postyar/bot/broadcast.tsx`** — rewritten:
+- `BotBroadcastViewProps.botId?: string` (optional). When provided: existing bot-scoped broadcast (message + comma-separated providerUserIds → `api.broadcastBot(botId, …)`). When omitted: **destination broadcast** — fetches `api.getDestinations()`, shows a multi-select chip list of destinations (label + provider badge), POSTs to the new `/api/destinations/broadcast` endpoint with `{ message, destinationIds }`.
+- Both modes share the message textarea + result panel (sent/failed counts + failure list).
+- Persian, RTL, lucide icons, Persian digits, toasts, loading skeletons, empty states. `cursor-pointer` + `focus-visible:ring-2` on every custom clickable.
+
+### Item 26 — Glass buttons without destination
+
+**`src/components/postyar/destinations/glass-buttons.tsx`** — rewritten:
+- `GlassButtonsViewProps.destinationId?: string` (optional). When provided: existing destination-scoped editor (two-column sortable editor + live preview, `api.createButton`/`api.updateButton`/`api.deleteButton`). When omitted: **preset library** mode — a grid of `PresetCard` components stored in localStorage (key `postyar:glass-button-presets`).
+- The presets section is rendered ABOVE the destination-scoped editor (visible in both modes) so the user can manage presets from either entry point.
+- Each `PresetCard` reuses the same field layout as `SortableButtonCard` (label / url / callbackData / rowOrder / enabled) + a live `.glass-chip` preview + an «افزودن به مقصد» panel: target-destination `<Select>` → `api.createButton(targetId, { label, url, callbackData, rowOrder, enabled })` copies the preset to a real `GlassButton` row. The Prisma schema's `GlassButton.destinationId` non-nullable constraint is respected.
+- Loading skeletons + empty/error states on every async surface. `cursor-pointer` + `focus-visible:ring-2` on every custom clickable.
+
+### Dashboard routing tweak (minimal, additive)
+
+**`src/components/postyar/dashboard/dashboard.tsx`** — 5 tiny edits (one per affected route):
+- `bot-workflow`, `bot-link`, `bot-history`, `bot-broadcast`, `glass-buttons`: replaced `if (!cleanParam) return <NotImplemented ... />; return <View ...={cleanParam} …/>` with `return <View ...={cleanParam || undefined} … />` so the without-bot/destination entry points are reachable. All five views now accept the optional prop and branch internally. No other dashboard.tsx code was touched.
+
+### Verification
+
+- `cd /home/z/my-project && bun run lint` → **EXIT 0** (zero errors, zero warnings).
+- `cd /home/z/my-project && bunx tsc --noEmit` → **EXIT 0** (zero type errors project-wide). Filtering `bunx tsc --noEmit 2>&1 | grep -E "bot/|referral|notifications|admin/broadcast|destinations/glass-buttons|dashboard/dashboard|payments/referral|bots/workflow|api/destinations/broadcast|api/referral|api/notifications|api/admin/notifications/broadcast"` → empty (zero hits in my files).
+
+### Items confirmed delivered
+
+- **ITEM 14 — Referral count**: ✓ `lib/payments/referral.ts` adds `referredCount` (count of Users where `referredById === currentUser.id`) + extended `referred[]` items (fullName/status/rewardStatus/rewardCreatedAt). `referral/view.tsx` shows «تعداد زیرمجموعه‌ها: N نفر» prominently + list of recent referrals with name + Jalali date + status + reward.
+- **ITEM 19 — Segmented notifications**: ✓ `lib/notifications/index.ts` adds `adminSegmentedBroadcast` (audienceType all/single/plan/plans/support; audienceMeta carries userId/planId/planIds[]; one BroadcastNotification row + batched Notification fan-out 200 per transaction). API route accepts the new body and resolves audience per the spec. Admin UI lets admin choose audience, pick user/plan(s), submit; toast «اعلان برای N کاربر ارسال شد».
+- **ITEM 12/20 — Workflow without bot**: ✓ `botId?` optional; unified all-bots workflows list with bot badge + bot filter; templates section (localStorage) with full editor + «انتقال به بات» promotion.
+- **ITEM 21 — Link codes without bot**: ✓ `botId?` optional; unified all-bots link-codes table with bot column; personal-codes section (localStorage) for short referral-style codes that can be copied/shared/claimed-toggled/deleted.
+- **ITEM 22 — Bot history without bot**: ✓ `botId?` optional; unified all-bots history table with bot column + bot filter; empty state with «ساخت بات» CTA when user has no bots (view still loads and renders).
+- **ITEM 23 — Broadcast without bot**: ✓ `botId?` optional; destination-broadcast mode (multi-select destinations → POST `/api/destinations/broadcast` → per-destination `provider.publishMessage`); existing bot-scoped broadcast untouched.
+- **ITEM 26 — Glass buttons without destination**: ✓ `destinationId?` optional; preset library section (localStorage) shown above the destination-scoped editor; each preset has full editor + live chip preview + «افزودن به مقصد» assignment to a real `GlassButton` row.
+
+### Constraints honored
+
+- All Persian, RTL (`dir="rtl"` on every section root and dialog content), Vazirmatn via Tailwind 4 base, lucide-react icons ONLY (verified exports: AlertCircleIcon, ArrowDownIcon, ArrowDownLeftIcon, ArrowRightIcon, ArrowUpRightIcon, BotIcon, CalendarIcon not used, CheckCheckIcon, CheckIcon, ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, CircleDotIcon, CircleIcon, CopyIcon, FlagIcon, GiftIcon, GripVerticalIcon, HistoryIcon, InboxIcon, KeyRoundIcon, LayoutTemplateIcon, LayoutGridIcon, LinkIcon, Loader2Icon, MegaphoneIcon, PencilRulerIcon not used here, PlusIcon, RadioIcon, RefreshCwIcon, SaveIcon, SearchIcon, SendIcon, Share2Icon, ShieldCheckIcon, SparklesIcon, SquareIcon, Trash2Icon, UsersIcon, Wand2Icon, WorkflowIcon, XIcon).
+- Persian digits via `toPersianDigits(...)` for: counts, char counters, page numbers, recipient counts, totals.
+- Jalali dates via `formatJalaliDateTime(...)` / `formatJalaliDate(...)` / `formatRelative(...)` for all timestamps.
+- Toasts (sonner) for every mutation: workflow create/save/delete, template save/promote/delete, link-code generate, personal-code create/toggle-claim/delete, broadcast send, preset save/assign/delete, referral load error, admin broadcast send.
+- Loading skeletons + error `Alert`s + empty states on every async surface.
+- `cursor-pointer` + `focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none` on every custom clickable (buttons, Selects, labels wrapping toggles, table-row action buttons, chip toggles, search-result buttons).
+- `requireUser` / `requireRole(["admin"])` enforced on all routes; ownership checks on every per-resource query.
+
+### Additive-only guarantees (no breakage to existing flows)
+
+- `botId` / `destinationId` props are still accepted (optional). When the dashboard passes `cleanParam || undefined`, the existing per-bot/per-destination flows run unchanged for any URL with a param.
+- All existing server routes untouched: `/api/bots/[id]/workflows*`, `/api/bots/[id]/link-code`, `/api/bots/[id]/link-codes`, `/api/bots/[id]/history`, `/api/bots/[id]/broadcast`, `/api/destinations`, `/api/destinations/[id]`, `/api/destinations/[id]/buttons*`, `/api/destinations/[id]/buttons/[buttonId]`, `/api/notifications`, `/api/notifications/unread-count`.
+- The legacy `adminBroadcast` (filter form) is preserved as a `@deprecated` wrapper — `api.adminBroadcast` in api.ts continues to POST `{ filter, … }` and the server route still accepts it via the `LegacySchema` branch.
+- The `ReferralStatsRow` type in `api.ts` is untouched (the new `referredCount` field is consumed via a local fetch in `referral/view.tsx`).
+- The dashboard.tsx tweak is minimal (5 lines, no functional changes outside those 5 routes).
+- No schema changes (`prisma/schema.prisma` untouched). No new server endpoints except one NEW file: `/api/destinations/broadcast/route.ts` (needed to support bot-less broadcast to destinations — the existing endpoints only sent to bot users).
+
+---
+
+## Task `revamp2-dashboard` — Items 4, 5, 6, 7, 8, 9 (dashboard redesign integration + new view wiring)
+
+### Scope
+
+Owned files (only these were edited/created):
+- `src/app/api/me/usage/route.ts` (**EXTENDED** — added `planFeatures` + `planCode` to the response so the dashboard can gate nav items by the active subscription's plan.features)
+- `src/components/postyar/dashboard/dashboard.tsx` (**REWRITTEN** — collapsible nav groups, scroll-to-top on nav, redesigned home with inline KPI strip + quick actions + recent activity, AdSlot + StickyAdBar mounted at the root, subscription-gated nav filtering, new renderView cases for `training` + `admin-orders-review`, polished header/sidebar/main styling)
+- `src/components/postyar/dashboard/stats-view.tsx` (**EXTENDED** — wrapped the existing content in a 3-tab `<Tabs>` (آمار / اینفوگرافیک / لیست) + added a new `InfographicTab` component with CSS bar charts and a conic-gradient donut)
+- `src/components/postyar/dashboard/profile.tsx` (**EXTENDED** — added a new `SubscriptionCard` showing the active plan name, days remaining, quota progress, and a CTA; falls back to an upgrade CTA when the user has no active subscription)
+
+Did NOT touch: `prisma/schema.prisma`, other agents' view files (landing, tickets, plans, ads, admin/*, bot/*, payment/*, etc. — they're done), all api routes except `/api/me/usage` (extended in-place, additive only — the existing fields are preserved).
+
+### Item 4 — Dashboard design upgrade
+
+- Header: kept all existing elements (`<Logo>`, `<HeaderClock>`, `<NotificationBell>`, admin↔user toggle, user name/role). Added backdrop-blur with `supports-[backdrop-filter]:bg-background/80` for a sticky frosted-glass feel. Added `focus-visible:ring-2` on the hamburger + the mode toggle.
+- Sidebar (desktop, lg+): card-style nav with collapsible section headers (see Item 5). Active item: `bg-primary/10 text-primary border-s-2 border-s-primary font-medium` (right border accent in RTL = `border-s-*` since `s` maps to the inline-start edge which is the right in RTL). Inactive: `text-muted-foreground hover:bg-muted hover:text-foreground border-s-2 border-s-transparent`. Sidebar background is `bg-card/40 backdrop-blur` on desktop for a subtle layered look.
+- Main content area: `max-w-6xl mx-auto` container, `p-4 pb-24 lg:p-6 lg:pb-6` (extra mobile bottom padding so the fixed bottom navbar never covers content). Card-based content throughout. `<AdSlot placement="user_dashboard_top" />` is rendered as the very first child inside the main content area (empty state renders null — non-intrusive).
+- Mobile bottom navbar: kept as-is (5 items + center FAB).
+- Footer: sticky to bottom, `mt-auto` preserved. Added `bg-background/80` so it stays readable over the gradient page background.
+- Root wrapper: `bg-gradient-to-b from-muted/30 via-background to-background` for a subtle vertical gradient (NOT the dark landing palette — the constraint about NO dark landing palette in the dashboard is honored).
+
+### Item 5 — Collapsible submenus
+
+- Nav reorganized into 6 groups via shadcn `<Collapsible>`:
+  - «حساب کاربری» (account): home, stats, subscriptions, plans, payment, orders, wallet, ledger, referral, advertising, tickets, notifications, profile, training (NEW).
+  - «محتوا» (content): content, content-editor, destinations, glass-buttons, woo.
+  - «هوش مصنوعی» (ai): ai-caption, ai-text, smart-reply, auto-responder, inbox.
+  - «بات و اتوماسیون» (bots): bots, bot-workflow, bot-link, bot-history, bot-broadcast.
+  - «طلا» (gold): gold, gold-bot.
+  - «مدیریت سامانه» (admin, adminOnly): admin-stats, admin-users, admin-plans, admin-audit, admin-health, admin-ads, admin-discounts, admin-bank-cards, admin-orders-review (NEW), admin-orders (legacy kept), admin-subscriptions, admin-bots, admin-woo, admin-gold, admin-broadcast, admin-tickets, admin-settings.
+- Each group header: `<CollapsibleTrigger>` button with a group icon (UserCogIcon / FileTextIcon / SparklesIcon / BotIcon / TrendingUpIcon / ServerIcon), the group label, a count `<Badge>` (Persian digits), and a `<ChevronDownIcon>` that rotates 180° when open.
+- Default state: «حساب کاربری» (account) is open; others are collapsed. The active item's group is auto-expanded on mount + on every nav change (so the user can always see where they are).
+- Expand state is persisted per-user in `localStorage["postyar_nav_groups"]` (a JSON map of `{ groupId: boolean }`). Survives reload.
+- The mobile bottom navbar is unchanged (it's a separate, fixed 5-item bar, not the collapsible desktop nav).
+
+### Item 6 — Scroll-to-top on nav
+
+- A `useEffect` on `[cleanView, cleanParam]`:
+  - `mainScrollRef.current?.scrollTo({ top: 0, behavior: "smooth" })` — the `<main>` element has a `ref`.
+  - `window.scrollTo({ top: 0, behavior: "smooth" })` as a fallback (covers the case where the main isn't itself a scroll container and the window is).
+- Verified: click a long-list view (e.g. orders), scroll down, click another view → the new view starts at the top.
+
+### Item 7 — Decluttered home with inline stats
+
+- `HomeView` rewritten (no longer the long flat card grid):
+  - **Welcome header**: «خوش آمدی، {firstName}» + the current plan name + days-remaining badge. If no active plan, an «ارتقای پلن» button → navigate("plans").
+  - **Inline KPI strip**: 4 cards (محتوا، کانال‌ها / مقاصد، انتشار، بازدید) reusing the existing `/api/stats/me` call (single fetch, no duplication). Each card has an icon + tinted background + Persian-digit value. A «مشاهدهٔ آمار کامل» button → navigate("stats").
+  - **Quick-actions row**: 6 shortcut cards (ساخت محتوا، افزودن مقصد، ساخت بات، شارژ کیف پول، تیکت پشتیبانی، آموزش) each a button that navigates. Motion-safe hover lift.
+  - **Recent activity**: last 3 notifications fetched from `/api/notifications?limit=3&offset=0` rendered as a clickable list (each row navigates to /dashboard/notifications). Empty state: «اعلان جدیدی برای نمایش وجود ندارد.» Loading: Skeleton.
+  - Loading skeleton for the whole KPI strip + recent-activity card.
+- Total height ≤ ~2 screens. The full stats live in the «آمار» view (Item 8).
+
+### Item 8 — Segregated reports (3-tab stats)
+
+- `stats-view.tsx` wrapped in a 3-tab `<Tabs>`:
+  - **«آمار» (statistical)** — the existing usage-counter cards (شمارش مصرف کارکرد) + the existing summary KPI grid (خلاصهٔ کلی) + the navigation CTA (پلن فعلی + مدیریت پلن).
+  - **«اینفوگرافیک» (infographic)** — a new `InfographicTab` component that renders (without recharts, pure CSS):
+    - Weekly growth bar (moved from the original Section 3 — bar + badge + Persian digits).
+    - Per-channel views bar chart (top 10 channels as horizontal bars, primary color).
+    - Status breakdown donut (`conic-gradient` with three segments: emerald = تحویل‌شده, rose = ناموفق, amber = در صف) + a center «کل» + a legend list with percentages.
+    - Top-clicked-buttons horizontal bars (rose color).
+    - Per-post views bars (top 8 posts, violet color).
+    - All values use Persian digits + `motion-safe:transition-all motion-safe:duration-700` for the bar widths.
+  - **«لیست» (list)** — the existing per-channel table + per-post table + top-buttons list, all in one place (the existing table components are unchanged).
+- Default tab: «آمار». `outline-none` on `TabsContent` so focus doesn't jump weirdly.
+- The admin stats view (`admin/stats.tsx`) was NOT touched — the backend-admin agent already fixed the Jalali date there; the task said "leave it" unless quick. The 3-tab layout is only on the user stats view.
+
+### Item 9 — Subscription-gated menu
+
+**`src/app/api/me/usage/route.ts`** — extended:
+- Now returns `planFeatures: PlanFeatures` (parsed via `parsePlanFeatures(sub.plan.features)` from `src/lib/payments/plans.ts`) on the active-subscription path, and `planFeatures: {}` (empty object) + `planCode: null` on the no-subscription path.
+- This is purely additive — every existing field is preserved (the `stats-view.tsx` and other consumers read the same fields, unchanged).
+- `requireUser()` enforced (untouched).
+
+**`dashboard.tsx`** — feature gating:
+- `NAV` items now carry an optional `featureKey: PlanBooleanFeatureKey` field mirroring the keys in `FEATURE_CATALOG` (`src/lib/payments/plans.ts`):
+  - `stats` → `stats`
+  - `wallet`, `ledger` → `wallet`
+  - `referral` → `referral`
+  - `advertising` → `advertising`
+  - `tickets` → `tickets`
+  - `content`, `content-editor` → `publish`
+  - `destinations` → `multiChannel`
+  - `glass-buttons` → `glassButtons`
+  - `woo` → `woo`
+  - `ai-caption` → `caption`
+  - `ai-text` → `smartText`
+  - `smart-reply` → `smartReply`
+  - `auto-responder` → `autoResponder`
+  - `inbox` → `inbox`
+  - `gold` → `goldMonitor`
+  - `gold-bot` → `goldBot`
+  - `bots`, `bot-history` → `bot`
+  - `bot-workflow` → `workflow`
+  - `bot-link` → `linkCodes`
+  - `bot-broadcast` → `broadcast`
+  - Items WITHOUT a featureKey (`home`, `plans`, `payment`, `orders`, `subscriptions`, `notifications`, `profile`, `training`) are ALWAYS shown.
+- `isVisible(item, isAdmin, features)`:
+  - Admin items (`adminOnly`) visible only when `isAdmin` and not in user-mode.
+  - Admin users see EVERYTHING (every user-facing item, regardless of plan).
+  - Non-admin: visible if no `featureKey` OR `features[featureKey] === true`.
+- The dashboard fetches `/api/me/usage` once on mount (after auth), stores `planFeatures` in state. While loading OR for admin users, gating is NOT active (so the user is never blocked during the brief fetch window).
+- When a non-admin user lands on a gated view (e.g. via `#/dashboard/ai-caption` URL hash) and their plan doesn't grant the feature, `renderView` returns `<UpgradeRequired navigate={navigate} />` instead of the view — a centered card with a `<SparklesIcon>` + «ارتقای پلن لازم است» + an «ارتقای پلن» button → navigate("plans").
+- The nav filtering + the view gating both use the same `isVisible`/`isViewGranted` helpers, so the visible nav items always match the accessible views.
+- When the user has NO active subscription (free/trial), only the always-on "account essentials" nav items appear (home, plans, payment, orders, subscriptions, notifications, profile, training). Everything else is hidden + an «ارتقای پلن» CTA when they try to access a gated feature directly.
+
+### New views wired in (verification of other agents' work)
+
+- **Training page**: `import { Training } from "@/components/postyar/landing/training";` + nav item `{ view: "training", label: "آموزش", icon: GraduationCapIcon, group: "account" }` + renderView `case "training": return <Training navigate={navigate} />;`. (The training component retains its dark navy theme; the constraint about NO dark landing palette in the dashboard applies to MY dashboard chrome, not to other agents' embedded content.)
+- **Admin orders-review**: `import AdminOrdersReviewView from "@/components/postyar/admin/orders-review";` + nav item `{ view: "admin-orders-review", label: "بازبینی سفارش‌ها", icon: ListOrderedIcon, group: "admin", adminOnly: true }` + renderView `case "admin-orders-review": return <AdminOrdersReviewView navigate={navigate} />;`. The legacy `admin-orders` item is kept (relabeled «سفارش‌ها (قدیمی)») so admins can fall back if needed; the new review view is the primary.
+- **Admin ticket-departments manager**: verified that `TicketDepartmentsManager` is ALREADY embedded inside `admin/tickets.tsx` (the admin-tickets view opens it via a Dialog). So no separate nav item was needed — the existing `admin-tickets` nav item already gives access to it.
+- **Ad slots**: `<AdSlot placement="user_dashboard_top" />` mounted as the first child of the main content area's inner container; `<AdSlot placement="user_dashboard_sidebar" />` mounted at the bottom of the desktop sidebar (above the user card + sign-out button). The empty state renders null — non-intrusive.
+- **Sticky ad bar**: `<StickyAdBar placement="sticky_bar" position="top" />` mounted at the dashboard root (the very first child of the root `<div>`), before the header. Self-contained — fetches its own data, dismissible per-session.
+
+### Constraints honored (universal)
+
+- All Persian text, RTL (`dir="rtl"` on every section root, `<main>`, `<aside>`, `<header>`, `<footer>`, `<nav>`, the `NavGroup` collapsible, the `Tabs` and all `TabsContent` blocks, the `HomeView` and its sub-cards, the `InfographicTab` and all its sections, the `SubscriptionCard` and all its blocks).
+- Vazirmatn via Tailwind 4 base (untouched).
+- lucide-react icons ONLY (verified exports: `ActivityIcon, BarChart3Icon, BellIcon, BookOpenIcon, BotIcon, CalendarClockIcon, ChartPieIcon, ChevronDownIcon, CopyIcon, CreditCardIcon, CrownIcon, FileTextIcon, GiftIcon, GraduationCapIcon, InboxIcon, KeyRoundIcon, LayoutGridIcon, ListChecksIcon, ListIcon, ListOrderedIcon, Loader2Icon, LockIcon, LogOutIcon, MegaphoneIcon, MenuIcon, MessageCircleIcon, MousePointerClickIcon, PackageIcon, PencilRulerIcon, PlusIcon, RadioIcon, RefreshCwIcon, SaveIcon, SendIcon, ServerIcon, SettingsIcon, ShieldCheckIcon, ShoppingCartIcon, SparklesIcon, TicketIcon, TrendingDownIcon, TrendingUpIcon, UserCogIcon, UserIcon, UsersIcon, WalletIcon, Wand2Icon, XIcon, ZapIcon, type LucideIcon`). No emojis anywhere.
+- Persian digits via `toPersianDigits(...)` for: nav group count badges, KPI strip values, quick-action labels (no digits), recent-activity timestamps (via `formatJalaliDate`), infographic bar values + donut percentages, subscription card days + percentages + counts.
+- Jalali dates via `formatJalaliDate(...)` for the subscription card's `پایان` field + the home view's recent-activity timestamps.
+- `cursor-pointer` + `focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none` on every custom clickable (nav items, collapsible triggers, quick-action cards, KPI «مشاهدهٔ آمار کامل» button, recent-activity list rows, sign-out button, mode toggle, hamburger, subscription card CTA buttons, Tabs triggers).
+- Loading skeletons + error/empty states on every async surface (HomeView KPI strip + recent activity; SubscriptionCard loading skeleton + no-subscription CTA; StatsView's existing skeleton/error/empty states preserved).
+- Toasts (sonner): not needed for this integration (no mutations introduced). The existing toasts in profile.tsx (save profile, change password, notify prefs) are preserved unchanged.
+- `motion-safe:` used for the sidebar's nav-item transitions, the home quick-action hover lift, the stats view's bar widths + donut, the collapsible chevron rotation.
+- `prefers-reduced-motion` respected via `motion-safe:` everywhere.
+- `requireUser()` on `/api/me/usage` (untouched).
+
+### Additive-only guarantees (no breakage to existing flows)
+
+- `/api/me/usage` is purely additive — every existing field is preserved (the `stats-view.tsx` consumer reads the same fields unchanged). The new `planFeatures` + `planCode` fields are extra keys that existing consumers simply ignore.
+- The dashboard's `renderView` switch is preserved verbatim for every existing case (only NEW cases added: `training`, `admin-orders-review`). No `case` was removed or changed.
+- The mobile bottom navbar, the admin↔user mode toggle, the `<NotificationBell>`, `<HeaderClock>`, and `<Logo>` are all preserved in the header.
+- The teal+gold theme is untouched (the dashboard's `bg-primary` accent + the gradient page background are the only color additions; no dark landing palette, no indigo/blue).
+- `prisma/schema.prisma` untouched. No schema changes.
+- No other agents' files touched.
+
+### Verification
+
+- `cd /home/z/my-project && bun run lint` → **EXIT 0** (zero errors, zero warnings).
+- `cd /home/z/my-project && bunx tsc --noEmit` → **EXIT 0** (zero type errors project-wide). Filtering `bunx tsc --noEmit 2>&1 | grep -E "dashboard|stats-view|profile|api/me"` → empty (zero hits in my files).
+- `curl -s -o /dev/null -w "HTTP %{http_code}\n" http://localhost:3000/` → **HTTP 200**. The dev server is running and serving the dashboard. The dev.log shows no errors or exceptions during the integration. All new API calls (`/api/me/usage`, `/api/ads/serve/user_dashboard_sidebar`, `/api/ads/serve/user_dashboard_top`, `/api/ads/serve/sticky_bar`, `/api/notifications?limit=3&offset=0`, `/api/stats/me`) return 200 for authenticated sessions (the dev.log shows them compiling + responding successfully).
+
+### Items confirmed delivered
+
+- **ITEM 4 — Dashboard design upgrade**: ✓ Header polished (backdrop-blur, focus rings). Sidebar card-style with right-border accent on active items. Main has max-width container + AdSlot at the top. Mobile bottom navbar kept. Footer sticky with `mt-auto`. Subtle vertical gradient on the root wrapper (no dark landing palette).
+- **ITEM 5 — Collapsible submenus**: ✓ 6 collapsible groups (account/content/ai/bots/gold/admin) via shadcn `<Collapsible>`. Chevron icon + count badge per group. Default open = account + the active group. State persisted in `localStorage["postyar_nav_groups"]`.
+- **ITEM 6 — Scroll-to-top on nav**: ✓ `useEffect` on `[cleanView, cleanParam]` scrolls both the `<main>` ref + the window to top (smooth). Verified.
+- **ITEM 7 — Decluttered home with inline stats**: ✓ Welcome header (firstName + plan name + days-remaining badge). 4-KPI strip (single `/api/stats/me` fetch). 6-card quick-actions row. 3-notification recent-activity list (single `/api/notifications?limit=3` fetch). ≤ ~2 screens total.
+- **ITEM 8 — Segregated reports**: ✓ 3-tab `<Tabs>` (آمار / اینفوگرافیک / لیست). The existing KPI cards + tables are preserved. New `InfographicTab` with weekly growth bar + per-channel bar chart + status-breakdown donut (conic-gradient) + top-buttons bars + per-post bars.
+- **ITEM 9 — Subscription-gated menu**: ✓ `/api/me/usage` extended with `planFeatures`. Nav items mapped to `featureKey`s mirroring `FEATURE_CATALOG`. Admin sees everything; non-admin sees only items whose `featureKey` is granted (or items without a `featureKey`). Direct-URL access to a gated view renders `<UpgradeRequired>` instead of the view.
+
+### New views wired in (final check)
+
+- ✓ `training` nav item + renderView case.
+- ✓ `admin-orders-review` nav item + renderView case.
+- ✓ `admin-ticket-departments` verified already-embedded inside `admin/tickets.tsx` (no separate nav item needed).
+- ✓ `<AdSlot placement="user_dashboard_top" />` mounted at the top of `<main>`.
+- ✓ `<AdSlot placement="user_dashboard_sidebar" />` mounted at the bottom of the desktop sidebar.
+- ✓ `<StickyAdBar placement="sticky_bar" position="top" />` mounted at the dashboard root.
+
+### Stage summary
+
+- Items 4 + 5 + 6 + 7 + 8 + 9 fully delivered end-to-end.
+- Lint + tsc clean (EXIT 0 for both, zero errors + zero warnings).
+- HTTP 200 on `/` confirmed.
+- No schema changes (`prisma/schema.prisma` untouched).
+- No breaking changes to other agents' files (only `dashboard.tsx`, `stats-view.tsx`, `profile.tsx`, and the additive `/api/me/usage` route were touched).
+- No blockers. The dashboard integration is complete — every feature built by other agents is now reachable + gated + polished within a single cohesive dashboard shell.
