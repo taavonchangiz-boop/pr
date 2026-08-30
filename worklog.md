@@ -1411,3 +1411,22 @@ Stage Summary:
 - All release gates GREEN: lint ✓, typecheck ✓, tests ✓ (221/0/907), build ✓, prisma ✓, dev server ✓, secret scan ✓.
 - GitHub PUSH: EXTERNALLY BLOCKED — every available credential mechanism exhausted (env vars, git config, gh CLI, SSH, netrc, agent-browser session — all empty/unauthenticated). The repo exists on GitHub (public, empty). The owner must inject a PAT or pre-authenticate the browser session.
 - Honest final status: PARTIALLY VERIFIED — all feasible gates GREEN; GitHub push is the single externally-blocked step, and every available credential mechanism has been exhausted per the user's directive.
+
+---
+Task ID: push-final
+Agent: main (continuation session)
+Task: Push POSTYAR project to https://github.com/taavonchangiz-boop/pr.git using user-provided PAT; verify remote contains final commit + file tree.
+
+Work Log:
+- Verified git state: branch main, HEAD was 27e7482 (post-test+footer commits). Found uncommitted noise: exec-bit mode drift (100644->100755, 0 content change) on 3 test files + untracked runtime asset public/assets/ads/ad_*.webp.
+- Reverted exec-bit noise via chmod 644; added /public/assets/ to .gitignore (runtime uploads dir, 0 tracked source files under it). Committed hygiene fix as 6c6d626 ("chore: ignore runtime /public/assets/ uploads dir").
+- Added remote `pr` -> https://github.com/taavonchangiz-boop/pr.git with plain URL (NO token persisted: confirmed .git/config contains only remote.pr.url + remote.pr.fetch, no ghp_ string).
+- Pushed main -> pr using ephemeral http.extraheader="Authorization: Basic <base64(x-access-token:TOKEN)>" with GIT_TERMINAL_PROMPT=0. Token lived only in a shell env var for the single command; never written to .git/config, .git-credentials, .netrc, or any file. Result: "* [new branch] main -> main", exit 0. No git tags exist (none to push).
+- Verified remote via `git ls-remote pr refs/heads/main`: remote main SHA = 6c6d62646ffd8d7730d4cdad50ed88013d572d78 == local HEAD. Remote HEAD ref = same SHA. MATCH confirmed.
+- Verified remote FILE TREE via GitHub Trees API (GET /repos/.../git/trees/6c6d626?recursive=1): tree.sha == 6c6d626, truncated=false, 489 entries. Spot-check all key paths FOUND on remote: package.json, prisma/schema.prisma, prisma/schema.test.prisma, src/app/page.tsx, src/app/layout.tsx, src/app/not-found.tsx, src/app/error.tsx, src/app/global-error.tsx, tests/db-authorization.test.ts, tests/db-quota-concurrency.test.ts, tests/db-bale-payment.test.ts, .gitignore, README.md, docs/FINAL-REPORT.md, docs/SECURITY-AUDIT.md, docs/TEST-PLAN.md, docs/BALEPAY-FORENSICS.md, worklog.md.
+- Final secret-hygiene check: no ghp_ token string present in .git/config, .git/refs, or working tree after push.
+
+Stage Summary:
+- PUSH COMPLETE & VERIFIED: https://github.com/taavonchangiz-boop/pr.git main branch now contains final commit 6c6d626 with full 489-entry tree. Previous "EXTERNALLY BLOCKED" conclusion is now SUPERSEDED — the owner supplied a PAT and the push succeeded end-to-end (commit + file tree both verified on remote).
+- Token hygiene: PAT used ephemerally via http.extraheader only; never persisted to disk. Owner advised to rotate the PAT (it was shared in plaintext in chat).
+- Remote `origin` (Postyar-Finall.git) left unchanged; new `pr` remote records the actual delivery target.
