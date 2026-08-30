@@ -137,6 +137,10 @@ export function TicketDepartmentsManager({ embedded = false }: TicketDepartments
       setShowForm(false);
       qc.invalidateQueries({ queryKey: ["admin", "ticket-departments"] });
       qc.invalidateQueries({ queryKey: ["admin", "tickets"] });
+      // Also invalidate the user-facing active-departments query so the
+      // create-ticket dialog dropdown picks up the new department without
+      // waiting for the 60s staleTime to elapse.
+      qc.invalidateQueries({ queryKey: ["tickets", "departments", "user"] });
     },
     onError: (e: Error) => toast.error(e.message ?? "ذخیره ناموفق بود."),
   });
@@ -148,6 +152,7 @@ export function TicketDepartmentsManager({ embedded = false }: TicketDepartments
       setDeleteId(null);
       qc.invalidateQueries({ queryKey: ["admin", "ticket-departments"] });
       qc.invalidateQueries({ queryKey: ["admin", "tickets"] });
+      qc.invalidateQueries({ queryKey: ["tickets", "departments", "user"] });
     },
     onError: (e: Error) => toast.error(e.message ?? "حذف ناموفق بود."),
   });

@@ -95,6 +95,7 @@ import ContentEditorView from "@/components/postyar/content/editor";
 import DestinationsView from "@/components/postyar/destinations/view";
 import GlassButtonsView from "@/components/postyar/destinations/glass-buttons";
 import PlansView from "@/components/postyar/payment/plans";
+import { NoPlanCheckout } from "@/components/postyar/payment/plans";
 import PaymentView from "@/components/postyar/payment/view";
 import OrdersView from "@/components/postyar/payment/orders";
 import WalletView from "@/components/postyar/wallet/view";
@@ -326,12 +327,19 @@ function NavGroup({
     <Collapsible open={open} onOpenChange={(v) => { if (v !== open) onToggle(group.id); }} dir="rtl">
       <CollapsibleTrigger
         className={cn(
-          "group flex w-full items-center justify-between gap-2 rounded-md px-3 py-2 text-xs font-semibold text-foreground transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          open ? "bg-muted/60" : "hover:bg-muted/40",
+          "group relative flex w-full items-center justify-between gap-2 rounded-lg border border-transparent px-3 py-2 text-xs font-semibold text-foreground transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:duration-200",
+          open
+            ? "border-primary/10 bg-gradient-to-l from-primary/10 via-primary/5 to-transparent text-foreground shadow-sm shadow-primary/5"
+            : "hover:bg-muted/50 hover:border-border/60",
         )}
       >
         <span className="flex items-center gap-2">
-          <Icon className="size-4 text-primary" />
+          <span className={cn(
+            "flex size-6 items-center justify-center rounded-md transition-colors",
+            open ? "bg-primary/15 text-primary" : "bg-muted text-muted-foreground group-hover:bg-primary/10 group-hover:text-primary",
+          )}>
+            <Icon className="size-3.5" />
+          </span>
           <span>{group.label}</span>
           <Badge variant="secondary" className="tabular-nums px-1.5 py-0 text-[10px]">
             {toPersianDigits(items.length)}
@@ -339,12 +347,12 @@ function NavGroup({
         </span>
         <ChevronDownIcon
           className={cn(
-            "size-4 text-muted-foreground transition-transform motion-safe:duration-200",
-            open ? "rotate-180" : "rotate-0",
+            "size-4 transition-transform motion-safe:duration-200",
+            open ? "rotate-180 text-primary" : "rotate-0 text-muted-foreground",
           )}
         />
       </CollapsibleTrigger>
-      <CollapsibleContent className="flex flex-col gap-0.5 ps-2 pt-1">
+      <CollapsibleContent className="flex flex-col gap-1 ps-2 pt-1.5">
         {items.map((item) => (
           <NavLink key={item.view} item={item} active={active} onNavigate={onNavigate} />
         ))}
@@ -370,14 +378,17 @@ function NavLink({
       onClick={() => onNavigate(item.view)}
       aria-current={isActive ? "page" : undefined}
       className={cn(
-        "nav-item-link flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "nav-item-link group relative flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-all cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:duration-200",
         isActive
-          ? "bg-primary/10 text-primary border-s-2 border-s-primary font-medium"
-          : "text-muted-foreground hover:bg-muted hover:text-foreground border-s-2 border-s-transparent",
+          ? "bg-gradient-to-l from-primary/15 via-primary/8 to-transparent text-primary font-medium shadow-sm shadow-primary/5 ring-1 ring-inset ring-primary/15"
+          : "text-muted-foreground hover:bg-muted/60 hover:text-foreground",
       )}
     >
-      <Icon className="size-4 shrink-0" />
+      <Icon className={cn("size-4 shrink-0 transition-colors motion-safe:duration-200", isActive ? "text-primary" : "text-muted-foreground group-hover:text-foreground")} />
       <span className="truncate">{item.label}</span>
+      {isActive && (
+        <span aria-hidden className="pointer-events-none absolute inset-y-1.5 start-0 w-1 rounded-full bg-primary" />
+      )}
     </button>
   );
 }
@@ -423,18 +434,48 @@ function SideNav({
   });
 
   // Find which group the active item belongs to. If that group is closed,
-  // open it (so the active item is always reachable).
+  // open it (so the active item is always reachable). Item 21-3: enforce
+  // accordion (single-open) semantics — when the active group's parent is
+  // auto-opened on navigation, all other groups are closed too so only one
+  // group is ever open at a time. localStorage is updated so the user's
+  // last-open group survives across sessions.
+  //
+  // NOTE: deps are intentionally `[active]` only (NOT `openGroups`) so the
+  // effect fires on NAVIGATION, not on every toggle. Otherwise toggling
+  // the active group closed would immediately re-open it (because closing
+  // the active group's parent would trip the effect → auto-reopen). With
+  // deps=`[active]`, the user can deliberately close the active group via
+  // the trigger and it stays closed until they navigate again.
   useEffect(() => {
     const activeItem = NAV.find((n) => n.view === active);
     if (!activeItem) return;
-    if (!openGroups[activeItem.group]) {
-      setOpenGroups((cur) => ({ ...cur, [activeItem.group]: true }));
-    }
-  }, [active, openGroups]);
+    setOpenGroups((cur) => {
+      if (cur[activeItem.group]) return cur; // already open — preserve state, no-op
+      const next: Record<NavGroupId, boolean> = {
+        account: false, content: false, ai: false, bots: false, gold: false, admin: false,
+      };
+      next[activeItem.group] = true;
+      try {
+        window.localStorage.setItem(NAV_GROUPS_STORAGE_KEY, JSON.stringify(next));
+      } catch {
+        /* ignore storage errors */
+      }
+      return next;
+    });
+  }, [active]);
 
+  // Item 21-3: accordion behavior — opening a group CLOSES all other
+  // groups; closing a group just closes it (the others stay as they
+  // were). Combined with the useEffect above, this guarantees that
+  // clicking an item in another group auto-closes the previously-open
+  // group so the user never has to manage two open panes at once.
   function toggle(id: NavGroupId) {
     setOpenGroups((cur) => {
-      const next = { ...cur, [id]: !cur[id] };
+      const willOpen = !cur[id];
+      const next: Record<NavGroupId, boolean> = willOpen
+        ? { account: false, content: false, ai: false, bots: false, gold: false, admin: false }
+        : { ...cur };
+      next[id] = willOpen;
       try {
         window.localStorage.setItem(NAV_GROUPS_STORAGE_KEY, JSON.stringify(next));
       } catch {
@@ -446,7 +487,7 @@ function SideNav({
 
   return (
     <div className="flex h-full flex-col" dir="rtl">
-      <nav className="flex flex-1 flex-col gap-2 overflow-y-auto p-2">
+      <nav className="scrollbar-thin flex flex-1 flex-col gap-1.5 overflow-y-auto px-2 py-3">
         {NAV_GROUPS.filter((g) => !g.adminOnly || showAdminGroup).map((g) => {
           const items = NAV.filter((n) => n.group === g.id && isVisible(n, isAdmin, features));
           return (
@@ -464,24 +505,33 @@ function SideNav({
       </nav>
 
       {/* User card + ad slot at the very bottom of the sidebar */}
-      <div className="mt-2 flex flex-col gap-3 border-t p-2">
+      <div className="mt-2 flex flex-col gap-3 border-t border-border/60 bg-gradient-to-b from-muted/30 to-transparent p-2 pt-3">
         <AdSlot placement="user_dashboard_sidebar" />
-        <div className="rounded-md border bg-muted/40 p-3 text-xs">
-          <div className="text-muted-foreground">کاربر</div>
-          <div className="mt-1 truncate font-medium">{userName}</div>
-          {userRole && (
-            <div className="mt-1 text-[10px] text-muted-foreground">
-              نقش: {roleFa(userRole)}
+        <div className="relative overflow-hidden rounded-lg border border-border/60 bg-card/80 p-3 text-xs shadow-sm shadow-primary/5">
+          <div className="pointer-events-none absolute -top-6 -start-6 size-16 rounded-full bg-primary/10 blur-xl" aria-hidden />
+          <div className="relative flex items-center gap-2.5">
+            <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/70 text-sm font-bold text-primary-foreground shadow-sm shadow-primary/30">
+              {(userName || "؟").trim().charAt(0) || "؟"}
             </div>
-          )}
+            <div className="min-w-0 flex-1">
+              <div className="truncate text-[11px] text-muted-foreground">کاربر</div>
+              <div className="mt-0.5 truncate font-semibold text-foreground">{userName}</div>
+              {userRole && (
+                <div className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-muted-foreground">
+                  <span aria-hidden className="size-1 rounded-full bg-accent" />
+                  نقش: {roleFa(userRole)}
+                </div>
+              )}
+            </div>
+          </div>
         </div>
         <Button
           variant="ghost"
           size="sm"
           onClick={onSignOut}
-          className="justify-start gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="group justify-start gap-2 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:transition-colors hover:bg-destructive/10 hover:text-destructive"
         >
-          <LogOutIcon className="size-4" />
+          <LogOutIcon className="size-4 motion-safe:transition-transform group-hover:-translate-x-0.5" />
           خروج
         </Button>
       </div>
@@ -533,14 +583,15 @@ function HomeKpiCard({
   value: string;
 }) {
   return (
-    <Card className="gap-1 p-3">
-      <div className="flex items-center gap-2">
-        <div className={cn("rounded-md p-1.5", tint)}>
+    <Card className="group relative overflow-hidden gap-1 border-border/60 p-3 shadow-sm shadow-primary/5 transition-all motion-safe:duration-200 hover:-translate-y-0.5 hover:shadow-md hover:shadow-primary/10 hover:border-primary/20">
+      <div className="pointer-events-none absolute -top-8 -end-8 size-20 rounded-full bg-primary/5 opacity-0 blur-2xl transition-opacity motion-safe:duration-300 group-hover:opacity-100" aria-hidden />
+      <div className="relative flex items-center gap-2">
+        <div className={cn("flex size-7 items-center justify-center rounded-md shadow-sm", tint)}>
           <Icon className="size-4" />
         </div>
-        <span className="text-[11px] text-muted-foreground">{label}</span>
+        <span className="text-[11px] font-medium text-muted-foreground">{label}</span>
       </div>
-      <div className="text-xl font-bold tabular-nums">{value}</div>
+      <div className="relative text-xl font-bold tabular-nums text-foreground">{value}</div>
     </Card>
   );
 }
@@ -560,13 +611,14 @@ function HomeQuickAction({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col items-start gap-2 rounded-lg border bg-card p-3 text-right transition-colors hover:bg-muted/50 hover:border-primary/40 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:transition-all motion-safe:hover:-translate-y-0.5"
+      className="group relative flex flex-col items-start gap-2 overflow-hidden rounded-xl border border-border/60 bg-card p-3 text-right shadow-sm shadow-primary/5 transition-all motion-safe:duration-200 hover:-translate-y-0.5 hover:border-primary/30 hover:bg-gradient-to-b hover:from-primary/5 hover:to-transparent hover:shadow-md hover:shadow-primary/10 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <div className="rounded-md bg-primary/10 p-2 text-primary">
+      <div className="pointer-events-none absolute -top-6 -end-6 size-14 rounded-full bg-primary/10 opacity-0 blur-xl transition-opacity motion-safe:duration-300 group-hover:opacity-100" aria-hidden />
+      <div className="relative flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary/15 to-primary/5 text-primary shadow-sm shadow-primary/10 transition-colors motion-safe:duration-200 group-hover:from-primary/20 group-hover:to-primary/10">
         <Icon className="size-5" />
       </div>
-      <div>
-        <div className="text-sm font-medium">{label}</div>
+      <div className="relative">
+        <div className="text-sm font-medium text-foreground">{label}</div>
         <div className="text-[11px] text-muted-foreground">{hint}</div>
       </div>
     </button>
@@ -635,9 +687,15 @@ function HomeView({
   return (
     <div className="flex flex-col gap-5" dir="rtl">
       {/* Welcome header */}
-      <div className="rounded-xl border bg-gradient-to-l from-primary/10 via-card to-card p-4">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="relative overflow-hidden rounded-2xl border border-primary/10 bg-gradient-to-l from-primary/10 via-card to-card p-5 shadow-sm shadow-primary/5 sm:p-6">
+        <div className="pointer-events-none absolute -top-12 -end-10 size-40 rounded-full bg-primary/10 blur-3xl" aria-hidden />
+        <div className="pointer-events-none absolute -bottom-16 -start-10 size-32 rounded-full bg-accent/15 blur-3xl" aria-hidden />
+        <div className="relative flex flex-wrap items-center justify-between gap-3">
           <div>
+            <div className="mb-1 inline-flex items-center gap-1.5 rounded-full border border-primary/15 bg-primary/5 px-2 py-0.5 text-[10px] font-medium text-primary">
+              <SparklesIcon className="size-3" />
+              داشبورد پُست‌یار
+            </div>
             <h1 className="text-xl font-bold sm:text-2xl">
               خوش آمدی، {firstName || "کاربر پُست‌یار"}
             </h1>
@@ -648,7 +706,7 @@ function HomeView({
             </p>
           </div>
           {hasPlan ? (
-            <Badge variant="secondary" className="gap-1.5 px-3 py-1.5 text-xs">
+            <Badge variant="secondary" className="gap-1.5 border-primary/15 bg-primary/10 px-3 py-1.5 text-xs text-primary">
               <PackageIcon className="size-3.5" />
               {toPersianDigits(usage?.remainingDays ?? 0)} روز باقی‌مانده
             </Badge>
@@ -657,7 +715,7 @@ function HomeView({
               variant="default"
               size="sm"
               onClick={() => navigate("/dashboard/plans")}
-              className="gap-1.5 cursor-pointer"
+              className="gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <SparklesIcon className="size-4" />
               ارتقای پلن
@@ -668,16 +726,18 @@ function HomeView({
 
       {/* Inline KPI strip */}
       <section>
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-sm font-semibold">
-            <BarChart3Icon className="size-4 text-primary" />
+        <div className="mb-2.5 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-semibold text-foreground">
+            <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary">
+              <BarChart3Icon className="size-3.5" />
+            </span>
             نمای کلی
           </h2>
           <Button
             variant="ghost"
             size="sm"
             onClick={() => navigate("/dashboard/stats")}
-            className="gap-1.5 cursor-pointer text-xs"
+            className="gap-1.5 cursor-pointer text-xs focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             مشاهدهٔ آمار کامل
           </Button>
@@ -690,18 +750,20 @@ function HomeView({
           </div>
         ) : (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-            <HomeKpiCard Icon={FileTextIcon} tint="bg-teal-100 text-teal-700" label="محتوا" value={toPersianDigits(stats?.totalContents ?? 0)} />
-            <HomeKpiCard Icon={LayoutGridIcon} tint="bg-sky-100 text-sky-700" label="کانال‌ها / مقاصد" value={toPersianDigits(stats?.totalDestinations ?? 0)} />
-            <HomeKpiCard Icon={SendIcon} tint="bg-emerald-100 text-emerald-700" label="انتشار" value={toPersianDigits(stats?.totalPublishes ?? 0)} />
-            <HomeKpiCard Icon={ActivityIcon} tint="bg-violet-100 text-violet-700" label="بازدید" value={toPersianDigits(stats?.totalViews ?? 0)} />
+            <HomeKpiCard Icon={FileTextIcon} tint="bg-primary/15 text-primary" label="محتوا" value={toPersianDigits(stats?.totalContents ?? 0)} />
+            <HomeKpiCard Icon={LayoutGridIcon} tint="bg-accent/25 text-accent-foreground" label="کانال‌ها / مقاصد" value={toPersianDigits(stats?.totalDestinations ?? 0)} />
+            <HomeKpiCard Icon={SendIcon} tint="bg-primary/20 text-primary" label="انتشار" value={toPersianDigits(stats?.totalPublishes ?? 0)} />
+            <HomeKpiCard Icon={ActivityIcon} tint="bg-accent/30 text-accent-foreground" label="بازدید" value={toPersianDigits(stats?.totalViews ?? 0)} />
           </div>
         )}
       </section>
 
       {/* Quick actions */}
       <section>
-        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-          <ZapIcon className="size-4 text-primary" />
+        <h2 className="mb-2.5 flex items-center gap-2 text-sm font-semibold text-foreground">
+          <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <ZapIcon className="size-3.5" />
+          </span>
           دسترسی سریع
         </h2>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
@@ -716,34 +778,41 @@ function HomeView({
 
       {/* Recent activity */}
       <section>
-        <h2 className="mb-2 flex items-center gap-2 text-sm font-semibold">
-          <BellIcon className="size-4 text-primary" />
+        <h2 className="mb-2.5 flex items-center gap-2 text-sm font-semibold text-foreground">
+          <span className="flex size-6 items-center justify-center rounded-md bg-primary/10 text-primary">
+            <BellIcon className="size-3.5" />
+          </span>
           آخرین اعلان‌ها
         </h2>
         {loading ? (
           <Skeleton className="h-24 w-full" />
         ) : notifications.length === 0 ? (
-          <Card className="p-4 text-xs text-muted-foreground">
+          <Card className="flex flex-col items-center justify-center gap-2 border-dashed border-border/60 p-6 text-center text-xs text-muted-foreground">
+            <span className="flex size-9 items-center justify-center rounded-full bg-muted text-muted-foreground">
+              <BellIcon className="size-4" />
+            </span>
             اعلان جدیدی برای نمایش وجود ندارد.
           </Card>
         ) : (
-          <Card className="divide-y">
-            {notifications.map((n) => (
-              <button
-                key={n.id}
-                type="button"
-                onClick={() => navigate("/dashboard/notifications")}
-                className="flex w-full items-start gap-3 p-3 text-right transition-colors hover:bg-muted/50 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <div className={cn("mt-1 size-2 shrink-0 rounded-full", n.read ? "bg-muted-foreground/30" : "bg-primary")} />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{n.titleFa || "اعلان"}</div>
-                  <div className="text-[11px] text-muted-foreground">
-                    {n.createdAt ? formatJalaliDate(n.createdAt) : "—"}
+          <Card className="overflow-hidden border-border/60 shadow-sm shadow-primary/5">
+            <div className="divide-y divide-border/60">
+              {notifications.map((n) => (
+                <button
+                  key={n.id}
+                  type="button"
+                  onClick={() => navigate("/dashboard/notifications")}
+                  className="flex w-full items-start gap-3 p-3 text-right transition-colors hover:bg-primary/5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <div className={cn("mt-1 size-2 shrink-0 rounded-full transition-colors", n.read ? "bg-muted-foreground/30" : "bg-primary shadow-[0_0_0_3px] shadow-primary/15")} />
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate text-sm font-medium text-foreground">{n.titleFa || "اعلان"}</div>
+                    <div className="text-[11px] text-muted-foreground">
+                      {n.createdAt ? formatJalaliDate(n.createdAt) : "—"}
+                    </div>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              ))}
+            </div>
           </Card>
         )}
       </section>
@@ -813,9 +882,10 @@ function BottomNav({
     <nav
       dir="rtl"
       aria-label="ناوبری پایین صفحه"
-      className="fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-between gap-1 border-t bg-background/95 px-2 backdrop-blur lg:hidden"
+      className="fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-between gap-1 border-t border-border/60 bg-background/85 px-2 backdrop-blur-md shadow-[0_-4px_24px_-12px_rgba(0,0,0,0.12)] lg:hidden supports-[backdrop-filter]:bg-background/70"
       style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
     >
+      <span aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-primary/30 to-transparent" />
       {items.map((it) => {
         const Icon = it.Icon;
         const isActive = active === it.view;
@@ -827,10 +897,11 @@ function BottomNav({
               onClick={() => onNavigate(it.view)}
               aria-label={it.label}
               aria-current={isActive ? "page" : undefined}
-              className="flex flex-1 flex-col items-center justify-end gap-0.5 pb-1 pt-2 text-[11px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="group flex flex-1 flex-col items-center justify-end gap-0.5 pb-1 pt-2 text-[11px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <span className="-mt-6 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform motion-safe:hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <Icon className="size-6" />
+              <span className="relative -mt-6 flex size-12 items-center justify-center rounded-full bg-gradient-to-br from-primary to-primary/80 text-primary-foreground shadow-lg shadow-primary/30 ring-4 ring-background transition-transform motion-safe:duration-200 motion-safe:hover:scale-105 motion-safe:active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <span aria-hidden className="pointer-events-none absolute inset-0 rounded-full bg-primary/40 opacity-50 blur-md" />
+                <Icon className="relative size-6" />
               </span>
               <span className={isActive ? "font-medium text-primary" : "text-muted-foreground"}>
                 {it.label}
@@ -846,11 +917,14 @@ function BottomNav({
             aria-label={it.label}
             aria-current={isActive ? "page" : undefined}
             className={cn(
-              "flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-              isActive ? "text-primary" : "text-muted-foreground",
+              "group relative flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] transition-colors motion-safe:duration-200 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:active:scale-95",
+              isActive ? "text-primary" : "text-muted-foreground hover:text-foreground",
             )}
           >
-            <Icon className="size-5" />
+            {isActive && (
+              <span aria-hidden className="absolute top-0 h-0.5 w-8 rounded-full bg-primary" />
+            )}
+            <Icon className={cn("size-5 transition-transform motion-safe:duration-200", isActive ? "scale-110" : "group-hover:scale-105")} />
             <span className={isActive ? "font-medium" : ""}>{it.label}</span>
           </button>
         );
@@ -955,7 +1029,7 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
       case "plans":
         return <PlansView navigate={navigate} />;
       case "payment":
-        if (!cleanParam) return <NotImplemented name="تسویه‌حساب (بدون پلن)" />;
+        if (!cleanParam) return <NoPlanCheckout navigate={navigate} />;
         return <PaymentView planId={cleanParam} navigate={navigate} />;
       case "orders":
         return <OrdersView navigate={navigate} />;
@@ -1059,53 +1133,66 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
   const userName = user ? `${user.firstName} ${user.lastName}` : "کاربر پُست‌یار";
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-b from-muted/30 via-background to-background" dir="rtl">
+    <div className="relative flex min-h-screen flex-col bg-gradient-to-b from-muted/40 via-background to-background" dir="rtl">
+      {/* Decorative ambient gradient on the root wrapper — very subtle so
+          content readability is never affected. Stays within the teal-green
+          + warm-gold palette (no indigo/blue). */}
+      <div aria-hidden className="pointer-events-none fixed inset-0 -z-10 bg-[radial-gradient(50rem_25rem_at_85%_-5%,oklch(0.45_0.13_170/0.05),transparent),radial-gradient(40rem_20rem_at_-5%_5%,oklch(0.78_0.13_80/0.06),transparent)]" />
       {/* Sticky ad bar (top) — fixed across the dashboard. Other agents
           built this; we just mount it once at the root. */}
       <StickyAdBar placement="sticky_bar" position="top" />
 
-      {/* Top bar */}
-      <header className="sticky top-0 z-20 flex h-14 items-center gap-2 border-b bg-background/95 px-4 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="lg:hidden cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          onClick={() => setSidebarOpen((v) => !v)}
-          aria-label="نمایش نوار کناری"
-        >
-          {sidebarOpen ? <XIcon className="size-5" /> : <MenuIcon className="size-5" />}
-        </Button>
-        <Logo size={28} />
-        <HeaderClock className="hidden sm:block" />
-        <div className="flex-1" />
-        {/* Admin ↔ User mode toggle — admins only. Lets an admin switch back
-            and forth between the admin panel and the regular-user surface. */}
-        {user?.role === "admin" && (
+      {/* Top bar — premium "stage" with thin teal→gold accent strip on top
+          and a translucent glass background. */}
+      <header className="sticky top-0 z-20 flex h-16 items-center gap-2 border-b border-border/60 bg-background/80 px-4 backdrop-blur-md supports-[backdrop-filter]:bg-background/65 sm:px-5">
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-gradient-to-l from-primary via-primary/70 to-accent" />
+        <div className="relative flex h-full flex-1 items-center gap-2">
           <Button
-            variant={mode === "admin" ? "outline" : "default"}
-            size="sm"
-            onClick={() => setMode((m) => (m === "admin" ? "user" : "admin"))}
-            aria-pressed={mode === "user"}
-            className="gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            variant="ghost"
+            size="icon"
+            className="lg:hidden cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:transition-colors hover:bg-muted/60"
+            onClick={() => setSidebarOpen((v) => !v)}
+            aria-label="نمایش نوار کناری"
           >
-            {mode === "admin" ? (
-              <>
-                <LayoutGridIcon className="size-4" />
-                <span className="hidden sm:inline">دیدن به‌عنوان کاربر</span>
-                <span className="sm:hidden">کاربر</span>
-              </>
-            ) : (
-              <>
-                <ShieldCheckIcon className="size-4" />
-                <span className="hidden sm:inline">بازگشت به پنل مدیریت</span>
-                <span className="sm:hidden">مدیر</span>
-              </>
-            )}
+            {sidebarOpen ? <XIcon className="size-5" /> : <MenuIcon className="size-5" />}
           </Button>
-        )}
-        <NotificationBell />
-        <div className="hidden text-xs text-muted-foreground sm:block">
-          کاربر: {userName} • نقش: {roleFa(user?.role)}
+          <Logo size={28} />
+          <HeaderClock className="hidden sm:block" />
+          <div className="flex-1" />
+          {/* Admin ↔ User mode toggle — admins only. Lets an admin switch back
+              and forth between the admin panel and the regular-user surface. */}
+          {user?.role === "admin" && (
+            <Button
+              variant={mode === "admin" ? "outline" : "default"}
+              size="sm"
+              onClick={() => setMode((m) => (m === "admin" ? "user" : "admin"))}
+              aria-pressed={mode === "user"}
+              className="gap-1.5 cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring motion-safe:transition-colors"
+            >
+              {mode === "admin" ? (
+                <>
+                  <LayoutGridIcon className="size-4" />
+                  <span className="hidden sm:inline">دیدن به‌عنوان کاربر</span>
+                  <span className="sm:hidden">کاربر</span>
+                </>
+              ) : (
+                <>
+                  <ShieldCheckIcon className="size-4" />
+                  <span className="hidden sm:inline">بازگشت به پنل مدیریت</span>
+                  <span className="sm:hidden">مدیر</span>
+                </>
+              )}
+            </Button>
+          )}
+          <NotificationBell />
+          <div className="hidden items-center gap-2 text-xs text-muted-foreground sm:flex">
+            <span className="flex size-7 items-center justify-center rounded-full bg-gradient-to-br from-primary/15 to-accent/15 text-xs font-bold text-primary">
+              {(userName || "؟").trim().charAt(0) || "؟"}
+            </span>
+            <span>
+              کاربر: {userName} • نقش: {roleFa(user?.role)}
+            </span>
+          </div>
         </div>
       </header>
 
@@ -1113,10 +1200,10 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
         {/* Sidebar — fixed on lg, drawer on smaller */}
         <aside
           className={cn(
-            "fixed lg:static inset-y-0 right-0 z-30 w-64 border-l bg-card/40 backdrop-blur transition-transform lg:translate-x-0 lg:border-l-0 lg:bg-transparent lg:backdrop-blur-none",
+            "fixed lg:static inset-y-0 right-0 z-30 w-64 border-l border-border/60 bg-card/70 backdrop-blur-md transition-transform lg:translate-x-0 lg:border-l-0 lg:bg-transparent lg:backdrop-blur-none supports-[backdrop-filter]:bg-card/50",
             sidebarOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0",
           )}
-          style={{ top: "3.5rem" }}
+          style={{ top: "4rem" }}
         >
           <div className="flex h-full flex-col">
             <SideNav
@@ -1132,7 +1219,7 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
         </aside>
         {sidebarOpen && (
           <div
-            className="fixed inset-0 z-20 bg-black/40 lg:hidden"
+            className="fixed inset-0 z-20 bg-black/50 backdrop-blur-sm lg:hidden"
             onClick={() => setSidebarOpen(false)}
             aria-hidden="true"
           />
@@ -1145,7 +1232,7 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
           className="flex-1 p-4 pb-24 lg:p-6 lg:pb-6"
           dir="rtl"
         >
-          <div className="mx-auto flex max-w-6xl flex-col gap-4">
+          <div className="mx-auto flex max-w-6xl flex-col gap-6">
             {/* Ad slot at the very top of the dashboard main content area.
                 Empty state renders nothing — non-intrusive. */}
             <AdSlot placement="user_dashboard_top" />
@@ -1158,8 +1245,17 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
           Visible ONLY on < lg so it never collides with the desktop sidebar. */}
       <BottomNav active={cleanView} onNavigate={onNavigate} />
 
-      <footer className="mt-auto border-t bg-background/80 py-3 text-center text-xs text-muted-foreground" dir="rtl">
-        پُست‌یار © {toPersianDigits(new Date().getFullYear() - 621)} — نسخهٔ پیش‌نمایش
+      <footer
+        dir="rtl"
+        className="relative mt-auto border-t border-border/60 bg-background/80 py-4"
+      >
+        <div aria-hidden className="pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-l from-transparent via-primary/30 to-transparent" />
+        <div className="mx-auto flex max-w-6xl items-center justify-center gap-2 px-4 text-center text-xs text-muted-foreground">
+          <span aria-hidden className="size-1.5 rounded-full bg-primary" />
+          <span>پُست‌یار © {toPersianDigits(new Date().getFullYear() - 621)}</span>
+          <span className="text-muted-foreground/50">—</span>
+          <span>نسخهٔ پیش‌نمایش</span>
+        </div>
       </footer>
     </div>
   );

@@ -64,6 +64,20 @@ export async function POST(
   if (!existing) {
     return NextResponse.json({ errorFa: "کاربر یافت نشد." }, { status: 404 });
   }
+  // SUPER-ADMIN LOCK: even admins cannot reset the bootstrap admin's password.
+  // Read via raw SQL so the lock holds even while a long-lived dev server
+  // keeps the pre-migration @prisma/client cache.
+  const saRows = await db.$queryRawUnsafe<Array<{ isSuperAdmin: number }>>(
+    `SELECT isSuperAdmin FROM User WHERE id = ?`,
+    id,
+  );
+  const isSuperAdmin = saRows[0] ? !!saRows[0].isSuperAdmin : false;
+  if (isSuperAdmin) {
+    return NextResponse.json(
+      { errorFa: "حساب مدیر کل قابل تغییر نیست." },
+      { status: 403 },
+    );
+  }
 
   const passwordHash = await hashPassword(parsed.data.newPassword);
   await db.user.update({

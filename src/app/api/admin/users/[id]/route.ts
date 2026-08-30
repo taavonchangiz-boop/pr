@@ -35,6 +35,14 @@ export async function GET(
     },
   });
   if (!u) return NextResponse.json({ errorFa: "کاربر یافت نشد." }, { status: 404 });
+  // Read isSuperAdmin via raw SQL so the route keeps working even while
+  // a long-lived dev server still has the pre-migration @prisma/client
+  // singleton in its require cache.
+  const saRows = await db.$queryRawUnsafe<Array<{ isSuperAdmin: number }>>(
+    `SELECT isSuperAdmin FROM User WHERE id = ?`,
+    id,
+  );
+  const isSuperAdmin = saRows[0] ? !!saRows[0].isSuperAdmin : false;
   return NextResponse.json({
     user: {
       id: u.id,
@@ -51,6 +59,7 @@ export async function GET(
       createdAt: u.createdAt.toISOString(),
       createdAtFa: formatJalaliDateTime(u.createdAt, { withTime: true }),
       updatedAt: u.updatedAt.toISOString(),
+      isSuperAdmin,
     },
   });
 }
@@ -91,6 +100,23 @@ export async function PATCH(
   // Only patch allowed fields (status, role). NEVER financial fields.
   const existing = await db.user.findUnique({ where: { id } });
   if (!existing) return NextResponse.json({ errorFa: "کاربر یافت نشد." }, { status: 404 });
+  // SUPER-ADMIN LOCK: the bootstrap admin's account is immutable from this
+  // route (and from the reset-password sibling). Even other admins cannot
+  // change its role or status. The only way to remove a super-admin is to
+  // demote them first via direct DB access (which is itself audited).
+  // We read isSuperAdmin via raw SQL so the lock still holds even while
+  // a long-lived dev server keeps the pre-migration @prisma/client cache.
+  const saRows = await db.$queryRawUnsafe<Array<{ isSuperAdmin: number }>>(
+    `SELECT isSuperAdmin FROM User WHERE id = ?`,
+    id,
+  );
+  const isSuperAdmin = saRows[0] ? !!saRows[0].isSuperAdmin : false;
+  if (isSuperAdmin) {
+    return NextResponse.json(
+      { errorFa: "حساب مدیر کل قابل تغییر نیست." },
+      { status: 403 },
+    );
+  }
   const data: Record<string, string> = {};
   if (parsed.data.status) data.status = parsed.data.status;
   if (parsed.data.role) data.role = parsed.data.role;

@@ -289,7 +289,187 @@
 
 /* Dialog: the default `sm:text-left` on the header should be centered/right
    in RTL. We center form popups explicitly; for content dialogs use right. */
-[dir="rtl"] [data-slot="dialog-header"] {
+[dir="rtl"] [data-slot="dialog-header"],
+[dir="rtl"] [data-slot="sheet-header"],
+[dir="rtl"] [data-slot="alert-dialog-header"],
+[dir="rtl"] [data-slot="drawer-header"] {
   text-align: center;
+}
+
+/* =====================================================================
+   RTL OVERRIDES — Comprehensive pass (Task 21-3)
+   ---------------------------------------------------------------------
+   Target every shadcn data-slot surface that ships with an LTR-leaning
+   default (`text-left`, `sm:text-left`, `right-4` for close buttons,
+   `flex-row` for tab lists, etc.) and force RTL-appropriate defaults.
+   Latin/mono content explicitly opting into LTR via `dir="ltr"` or
+   `.ltr` is left alone.
+   ===================================================================== */
+
+/* ── Group 1: text-align: right on every Persian-content surface ── */
+[dir="rtl"] [data-slot="dialog-content"],
+[dir="rtl"] [data-slot="sheet-content"],
+[dir="rtl"] [data-slot="alert-dialog-content"],
+[dir="rtl"] [data-slot="drawer-content"],
+[dir="rtl"] [data-slot="card"],
+[dir="rtl"] [data-slot="card-header"],
+[dir="rtl"] [data-slot="card-title"],
+[dir="rtl"] [data-slot="card-description"],
+[dir="rtl"] [data-slot="card-content"],
+[dir="rtl"] [data-slot="card-footer"],
+[dir="rtl"] [data-slot="card-action"],
+[dir="rtl"] [data-slot="alert"],
+[dir="rtl"] [data-slot="alert-title"],
+[dir="rtl"] [data-slot="alert-description"],
+[dir="rtl"] [data-slot="accordion-content"],
+[dir="rtl"] [data-slot="collapsible-content"],
+[dir="rtl"] [data-slot="tabs"],
+[dir="rtl"] [data-slot="tabs-content"],
+[dir="rtl"] [data-slot="radio-group"],
+[dir="rtl"] [data-slot="label"],
+[dir="rtl"] [data-slot="form"],
+[dir="rtl"] [data-slot="form-item"],
+[dir="rtl"] [data-slot="form-label"],
+[dir="rtl"] [data-slot="form-message"],
+[dir="rtl"] [data-slot="form-description"],
+[dir="rtl"] [data-slot="command"],
+[dir="rtl"] [data-slot="command-list"],
+[dir="rtl"] [data-slot="command-group"],
+[dir="rtl"] [data-slot="command-empty"],
+[dir="rtl"] [data-slot="breadcrumb"],
+[dir="rtl"] [data-slot="tooltip-content"],
+[dir="rtl"] [data-slot="popover-content"],
+[dir="rtl"] [data-slot="hover-card-content"],
+[dir="rtl"] [data-slot="scroll-area"],
+[dir="rtl"] [data-slot="separator"],
+[dir="rtl"] [data-slot="badge"],
+[dir="rtl"] [data-slot="dialog-description"],
+[dir="rtl"] [data-slot="sheet-description"],
+[dir="rtl"] [data-slot="alert-dialog-description"],
+[dir="rtl"] [data-slot="drawer-description"] {
+  text-align: right;
+}
+
+/* Inputs/textareas/selects: Persian placeholder + value should hug the
+   right edge in RTL. Inputs marked `dir="ltr"` (emails, codes, card
+   numbers) keep their LTR text-align. */
+[dir="rtl"] [data-slot="input"]:not([dir="ltr"]):not(.ltr),
+[dir="rtl"] [data-slot="textarea"]:not([dir="ltr"]):not(.ltr),
+[dir="rtl"] [data-slot="select-trigger"]:not([dir="ltr"]):not(.ltr),
+[dir="rtl"] [data-slot="select-value"]:not([dir="ltr"]):not(.ltr),
+[dir="rtl"] [data-slot="sidebar-input"]:not([dir="ltr"]):not(.ltr) {
+  text-align: right;
+}
+
+/* ── Group 2: Dialog/Sheet close button → physical LEFT (visual right
+   end of the header). Default shadcn places it at `right-4` which
+   overlaps right-aligned text in RTL. ── */
+[dir="rtl"] [data-slot="dialog-content"] [data-slot="dialog-close"],
+[dir="rtl"] [data-slot="sheet-content"] [data-slot="sheet-close"],
+[dir="rtl"] [data-slot="sheet-content"] > [data-slot="sheet-close"],
+[dir="rtl"] [data-slot="alert-dialog-content"] [data-slot="alert-dialog-cancel"]:only-child {
+  right: auto;
+  left: 1rem;
+}
+
+/* ── Group 3: Tabs list reads right-to-left in RTL. The default
+   flex-row order puts the first tab at the visual left; we want it
+   at the visual right (RTL reading start). ── */
+[dir="rtl"] [data-slot="tabs-list"] {
+  flex-direction: row-reverse;
+}
+
+/* ── Group 4: Dialog/AlertDialog footer — buttons stack with the
+   primary action on the visual LEFT (end) in RTL. Default shadcn
+   `sm:justify-end` works correctly in RTL because flexbox end flips
+   with `dir`. No-op needed; documented for clarity. ── */
+
+/* ── Group 5: Accordion chevron rotation. The shadcn default rotates
+   the chevron 180° when open. In RTL we want the chevron to point
+   "back" (start direction = right) when closed and rotate to point
+   left when open. The default ChevronDownIcon + rotate-180 already
+   produces correct visual semantics (down → up). No-op. ── */
+
+/* ── Group 6: Sidebar menu items — the shadcn default has `text-left`
+   which is wrong in RTL. Force right alignment for sidebar primitives
+   that are NOT explicitly opted into LTR. ── */
+[dir="rtl"] [data-slot="sidebar-menu-button"],
+[dir="rtl"] [data-slot="sidebar-menu-sub-button"],
+[dir="rtl"] [data-slot="sidebar-menu-action"],
+[dir="rtl"] [data-slot="sidebar-group-label"],
+[dir="rtl"] [data-slot="sidebar-menu-badge"],
+[dir="rtl"] [data-slot="sidebar-header"],
+[dir="rtl"] [data-slot="sidebar-footer"],
+[dir="rtl"] [data-slot="sidebar-group"],
+[dir="rtl"] [data-slot="sidebar-group-content"],
+[dir="rtl"] [data-slot="sidebar-menu"],
+[dir="rtl"] [data-slot="sidebar-menu-sub"],
+[dir="rtl"] [data-slot="sidebar-menu-item"],
+[dir="rtl"] [data-slot="sidebar-menu-sub-item"] {
+  text-align: right;
+}
+
+/* ── Group 7: Drawer footer — right-aligned in RTL (drawer-header keeps
+   the centered look set in the first RTL block above). ── */
+[dir="rtl"] [data-slot="drawer-footer"] {
+  text-align: right;
+}
+
+/* ── Group 8: Pagination — items should flow right-to-left in RTL. ── */
+[dir="rtl"] [data-slot="pagination"],
+[dir="rtl"] [data-slot="pagination-content"] {
+  flex-direction: row-reverse;
+}
+
+/* ── Group 9: Toggle group — items flow right-to-left in RTL. ── */
+[dir="rtl"] [data-slot="toggle-group"] {
+  flex-direction: row-reverse;
+}
+
+/* ── Group 10: Form control (the wrapping div around inputs) — its
+   inline help text, descriptions, etc. should align right. ── */
+[dir="rtl"] [data-slot="form-control"] {
+  text-align: right;
+}
+
+/* ── Group 11: Tooltip trigger — buttons that act as tooltip triggers
+   shouldn't force LTR. Most inherit from the parent, but explicit
+   right alignment is safer. ── */
+[dir="rtl"] [data-slot="tooltip-trigger"] {
+  text-align: right;
+}
+
+/* ── Group 12: Carousel — content should respect RTL direction. ── */
+[dir="rtl"] [data-slot="carousel"] {
+  direction: rtl;
+}
+
+/* ── Group 13: Calendar — the Persian Jalali calendar (when used)
+   should remain RTL; the underlying react-day-picker handles its own
+   direction. The wrapper just inherits. ── */
+
+/* ── Group 14: Hover card trigger — keep right-aligned. ── */
+[dir="rtl"] [data-slot="hover-card-trigger"] {
+  text-align: right;
+}
+
+/* ── Group 15: Navigation menu — list items flow RTL. ── */
+[dir="rtl"] [data-slot="navigation-menu-list"] {
+  flex-direction: row-reverse;
+}
+
+/* ── Group 16: Avatar (used in user cards) — no text alignment needed;
+   the surrounding flex container handles the layout. ── */
+
+/* ── Group 17: Slider — range fill should originate from the right
+   (start) in RTL. Radix handles this via `dir` attribute inheritance
+   when the parent has dir="rtl". No-op. ── */
+
+/* ── Group 18: Sonner toasts — position top-center stays the same, but
+   toast content should be right-aligned. The Sonner library reads
+   dir from <html>; we only need to ensure text alignment. ── */
+[dir="rtl"] [data-sonner-toaster] [data-sonner-toast] {
+  text-align: right;
+  direction: rtl;
 }
 

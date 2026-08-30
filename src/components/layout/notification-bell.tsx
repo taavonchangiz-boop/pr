@@ -1,6 +1,9 @@
 "use client";
 // POSTYAR notification bell — polls /api/notifications/unread-count, shows a
 // destructive unread badge, and opens a popover with the latest notifications.
+// Clicking a notification navigates via the SPA hash-router (NOT a hard <a>
+// reload) to the action link stored on the notification. Falls back to the
+// notifications list view when the link is empty.
 import { useEffect, useState } from "react";
 import { Bell } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -17,6 +20,21 @@ type Notif = {
   createdAt: string;
   category?: string | null;
 };
+
+/** Hash-route navigate helper (mirrors postyar-app's navigate). Accepts both
+ *  "/dashboard/foo" and "dashboard/foo" forms + "#/dashboard/foo". When the
+ *  link is missing/empty, falls back to the notifications list view. */
+function navToAction(link: string | null | undefined) {
+  const target = (link ?? "").trim();
+  if (!target) {
+    window.location.hash = "/dashboard/notifications";
+    return;
+  }
+  // strip leading "#"
+  const clean = target.replace(/^#/, "");
+  // strip leading slash — window.location.hash expects a path WITHOUT leading /
+  window.location.hash = clean.startsWith("/") ? clean : `/${clean}`;
+}
 
 export function NotificationBell({ className }: { className?: string }) {
   const { user } = useSession();
@@ -63,6 +81,31 @@ export function NotificationBell({ className }: { className?: string }) {
     if (open) void loadItems();
   }, [open]);
 
+  // Mark a notification as read when clicked (best-effort — no error toast on failure).
+  async function markRead(id: string) {
+    try {
+      await fetch("/api/notifications", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ notificationId: id }),
+      });
+      // Optimistically decrement the badge so the user gets instant feedback.
+      setUnread((u) => Math.max(0, u - 1));
+    } catch {
+      /* silent */
+    }
+  }
+
+  function onClick(n: Notif, e: React.MouseEvent) {
+    e.preventDefault();
+    void markRead(n.id);
+    // Optimistically mark read in the local list too.
+    setItems((cur) => cur.map((it) => (it.id === n.id ? { ...it, readAt: it.readAt ?? new Date().toISOString() } : it)));
+    setOpen(false);
+    navToAction(n.link);
+  }
+
   if (!user) return null;
 
   return (
@@ -71,7 +114,7 @@ export function NotificationBell({ className }: { className?: string }) {
         <button
           type="button"
           className={cn(
-            "relative inline-flex size-9 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            "relative inline-flex size-9 items-center justify-center rounded-md text-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer",
             className,
           )}
           aria-label={`اعلان‌ها${unread > 0 ? `، ${toPersianDigits(unread)} خوانده‌نشده` : ""}`}
@@ -96,10 +139,11 @@ export function NotificationBell({ className }: { className?: string }) {
             </div>
           ) : (
             items.map((n) => (
-              <a
+              <button
                 key={n.id}
-                href={n.link ?? "#"}
-                className="block border-b px-3 py-2 transition-colors hover:bg-muted/60"
+                type="button"
+                onClick={(e) => onClick(n, e)}
+                className="block w-full cursor-pointer border-b px-3 py-2 text-right transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               >
                 <div className="flex items-center gap-2">
                   <span
@@ -117,7 +161,7 @@ export function NotificationBell({ className }: { className?: string }) {
                 {n.bodyFa && (
                   <div className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.bodyFa}</div>
                 )}
-              </a>
+              </button>
             ))
           )}
         </div>

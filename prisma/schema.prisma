@@ -26,6 +26,7 @@ model User {
   activityType  String   @default("other")   // personal/business/marketer/...
   businessName  String   @default("")
   role          String   @default("user")    // user | support | admin
+  isSuperAdmin  Boolean  @default(false)    // bootstrap admin (first registered user) — locked from mutations
   status        String   @default("active")  // active | suspended
   referralCode  String   @unique
   referredById  String?
@@ -451,8 +452,14 @@ model AdPlacement {
   key           String   @id // unique stable key, e.g. "sticky_bar"
   labelFa       String
   descriptionFa String   @default("")
-  // kind: "sticky_bar" | "banner_inline" | "sidebar_card" | "fullscreen"
+  // kind: "sticky_bar" | "banner_inline" | "sidebar_card" | "fullscreen" | "slider"
   kind          String   @default("banner_inline")
+  // Recommended image dimensions (pixels) — shown to advertisers before they
+  // upload, so they can produce an image that fits the slot. 0 means "any".
+  recommendedWidth   Int  @default(0)
+  recommendedHeight  Int  @default(0)
+  // Max upload size in bytes (0 = no special limit, fall back to the global 5 MiB).
+  maxFileBytes Int      @default(0)
   active        Boolean  @default(true)
   sortOrder     Int      @default(0)
   createdAt     DateTime @default(now())

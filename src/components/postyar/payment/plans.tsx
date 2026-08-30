@@ -156,7 +156,7 @@ const NO_PLAN_METHODS = [
 
 const MIN_AMOUNT_RIALS = 100_000; // server enforces — 10,000 toman
 
-function NoPlanCheckout({ navigate }: { navigate: (to: string) => void }) {
+export function NoPlanCheckout({ navigate }: { navigate: (to: string) => void }) {
   const qc = useQueryClient();
   const [amountInput, setAmountInput] = useState(""); // Persian digits string
   const [method, setMethod] = useState<"card" | "bank" | "bale">("card");

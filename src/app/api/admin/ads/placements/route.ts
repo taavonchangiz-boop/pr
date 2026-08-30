@@ -6,7 +6,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireRole, clientIp, audit, AuthError } from "@/lib/server/auth";
 
-const KINDS = ["sticky_bar", "banner_inline", "sidebar_card", "fullscreen"] as const;
+const KINDS = ["sticky_bar", "banner_inline", "sidebar_card", "fullscreen", "slider"] as const;
 type AdKind = (typeof KINDS)[number];
 
 export interface AdPlacementRow {
@@ -16,6 +16,9 @@ export interface AdPlacementRow {
   kind: AdKind | string;
   active: boolean;
   sortOrder: number;
+  recommendedWidth: number;
+  recommendedHeight: number;
+  maxFileBytes: number;
   createdAt: string;
   updatedAt: string;
   campaignCount: number;
@@ -28,6 +31,9 @@ function toRow(p: {
   kind: string;
   active: boolean;
   sortOrder: number;
+  recommendedWidth: number;
+  recommendedHeight: number;
+  maxFileBytes: number;
   createdAt: Date;
   updatedAt: Date;
 }, campaignCount: number): AdPlacementRow {
@@ -38,6 +44,9 @@ function toRow(p: {
     kind: p.kind,
     active: p.active,
     sortOrder: p.sortOrder,
+    recommendedWidth: p.recommendedWidth,
+    recommendedHeight: p.recommendedHeight,
+    maxFileBytes: p.maxFileBytes,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
     campaignCount,
@@ -71,6 +80,9 @@ const CreateSchema = z.object({
   labelFa: z.string().min(1, "برچسب فارسی الزامی است.").max(120),
   descriptionFa: z.string().max(500).optional(),
   kind: z.enum(KINDS).default("banner_inline"),
+  recommendedWidth: z.number().int().min(0).max(8000).default(0),
+  recommendedHeight: z.number().int().min(0).max(8000).default(0),
+  maxFileBytes: z.number().int().min(0).max(20 * 1024 * 1024).default(0),
   active: z.boolean().default(true),
   sortOrder: z.number().int().default(0),
 });
@@ -105,6 +117,9 @@ export async function POST(req: Request) {
         labelFa: parsed.data.labelFa,
         descriptionFa: (parsed.data.descriptionFa ?? "").slice(0, 500),
         kind: parsed.data.kind,
+        recommendedWidth: parsed.data.recommendedWidth,
+        recommendedHeight: parsed.data.recommendedHeight,
+        maxFileBytes: parsed.data.maxFileBytes,
         active: parsed.data.active,
         sortOrder: parsed.data.sortOrder,
       },

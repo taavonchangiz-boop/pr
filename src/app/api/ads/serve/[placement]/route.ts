@@ -20,6 +20,11 @@ export async function GET(_req: Request, { params }: Params) {
     return NextResponse.json({ campaigns: [] });
   }
   const now = new Date();
+  // Slider placements render one campaign at a time (the preview pane on the
+  // create-ad form shows rounded corners + nav-dots; multi-slide logic is
+  // out of scope per the task brief, so we just take 1 here and the
+  // <AdSlot> client treats `slider` kind the same as `banner_inline`).
+  const isSlider = slot.kind === "slider";
   const rows = await db.adCampaign.findMany({
     where: {
       placement,
@@ -28,7 +33,7 @@ export async function GET(_req: Request, { params }: Params) {
       AND: [{ OR: [{ endAt: null }, { endAt: { gt: now } }] }],
     },
     orderBy: { createdAt: "desc" },
-    take: 10,
+    take: isSlider ? 1 : 10,
   });
   // Fire-and-forget impressions. The lib already swallows errors so this is safe.
   for (const r of rows) {

@@ -679,6 +679,7 @@ export type AdminUserRow = {
   referredById: string | null;
   createdAt: string;
   createdAtFa: string;
+  isSuperAdmin?: boolean;
 };
 
 export type AdminPlanRow = {
@@ -1151,10 +1152,24 @@ export const api = {
     const data = await jsonOrThrow(await fetch("/api/tickets?limit=100", { credentials: "same-origin" }));
     return data.items ?? [];
   },
-  async createTicket(body: { subject: string; body: string; category: string; priority?: string }): Promise<{ ok: boolean; ticket: TicketRow }> {
+  async createTicket(body: {
+    subject: string;
+    body: string;
+    category: string;
+    priority?: "low" | "normal" | "high" | "urgent";
+    departmentId?: string | null;
+  }): Promise<{ ok: boolean; ticket: TicketRow }> {
     const data = await jsonOrThrow(await fetch("/api/tickets", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), credentials: "same-origin" }));
     if (!data.ticket) throw new Error(data.errorFa ?? "ایجاد تیکت ناموفق بود.");
     return { ok: true, ticket: data.ticket };
+  },
+  /**
+   * User-facing: list ACTIVE ticket departments (for the create-ticket
+   * dialog dropdown). Hits /api/tickets/departments which is open to any
+   * signed-in user. Returns only `active=true` rows sorted by priority asc.
+   */
+  async getTicketDepartmentsForUser(): Promise<{ items: TicketDepartmentRow[] }> {
+    return jsonOrThrow(await fetch("/api/tickets/departments", { credentials: "same-origin" }));
   },
   async getTicketDetail(id: string): Promise<{ ticket: TicketRow; replies: TicketReplyView[] }> {
     const data = await jsonOrThrow(await fetch(`/api/tickets/${id}`, { credentials: "same-origin" }));

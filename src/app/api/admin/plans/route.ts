@@ -57,7 +57,7 @@ const PostSchema = z.object({
   intervalMonths: z.number().int().min(1).max(12),
   quota: z.record(z.string(), z.number()).optional(),
   features: z.record(z.string(), z.union([z.boolean(), z.number()])).optional(),
-  imageUrl: z.string().max(2048).optional(),
+  imageUrl: z.string().max(2048).nullable().optional(),
   discountPct: z.number().int().min(0).max(100).optional(),
   renewalDiscountPct: z.number().int().min(0).max(100).optional(),
   renewalDiscountWindowDays: z.number().int().min(0).max(365).optional(),

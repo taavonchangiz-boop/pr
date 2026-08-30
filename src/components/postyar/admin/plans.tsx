@@ -41,7 +41,7 @@ import {
   UploadCloudIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -605,8 +605,8 @@ function AdminPlansInner({ navigate: _navigate }: AdminPlansViewProps) {
               {form.id ? "ویرایش پلن" : "پلن جدید"}
             </DialogTitle>
             <DialogDescription>
-              امکانات را به‌صورت دقیق انتخاب کنید و تخفیف‌ها را تنظیم نمایید.
-              تغییرات بلافاصله در صفحهٔ عمومی پلن‌ها منعکس می‌شود.
+              امکانات اشتراک را دقیق انتخاب کنید و تخفیف‌ها را تنظیم کنید.
+              تغییرات بلافاصله در صفحهٔ پلن‌ها برای کاربران نمایش داده می‌شود.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -619,7 +619,7 @@ function AdminPlansInner({ navigate: _navigate }: AdminPlansViewProps) {
             {/* ---------- Basic fields ---------- */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="p-code">کد پلن</Label>
+                <Label htmlFor="p-code">شناسهٔ پلن (انگلیسی)</Label>
                 <Input
                   id="p-code"
                   dir="ltr"
@@ -630,7 +630,7 @@ function AdminPlansInner({ navigate: _navigate }: AdminPlansViewProps) {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="p-name">نام (فارسی)</Label>
+                <Label htmlFor="p-name">نام اشتراک</Label>
                 <Input
                   id="p-name"
                   value={form.nameFa}
@@ -651,7 +651,7 @@ function AdminPlansInner({ navigate: _navigate }: AdminPlansViewProps) {
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="p-price">مبلغ (ریال)</Label>
+                <Label htmlFor="p-price">قیمت (ریال)</Label>
                 <Input
                   id="p-price"
                   inputMode="numeric"
@@ -661,7 +661,7 @@ function AdminPlansInner({ navigate: _navigate }: AdminPlansViewProps) {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="p-int">بازه (ماه)</Label>
+                <Label htmlFor="p-int">مدت اشتراک (ماه)</Label>
                 <Input
                   id="p-int"
                   type="number"
@@ -673,7 +673,7 @@ function AdminPlansInner({ navigate: _navigate }: AdminPlansViewProps) {
                 />
               </div>
               <div className="flex flex-col gap-1.5">
-                <Label htmlFor="p-sort">ترتیب نمایش</Label>
+                <Label htmlFor="p-sort">جایگاه در فهرست</Label>
                 <Input
                   id="p-sort"
                   type="number"
@@ -687,7 +687,7 @@ function AdminPlansInner({ navigate: _navigate }: AdminPlansViewProps) {
 
             {/* ---------- ITEM 33: Plan image ---------- */}
             <div className="flex flex-col gap-1.5">
-              <Label htmlFor="p-image">تصویر پلن</Label>
+              <Label htmlFor="p-image">تصویر اشتراک</Label>
               <div className="flex flex-wrap items-center gap-3">
                 <PlanThumb
                   imageUrl={form.imageUrl}
@@ -783,8 +783,11 @@ function AdminPlansInner({ navigate: _navigate }: AdminPlansViewProps) {
               <CardHeader className="pb-2 pt-3">
                 <CardTitle className="flex items-center gap-2 text-sm">
                   <TagIcon className="size-4" />
-                  تخفیف تمدید زودهنگام
+                  تخفیف برای تمدید زودهنگام
                 </CardTitle>
+                <CardDescription className="text-xs">
+                  اگر کاربر اشتراک خود را قبل از پایان آن تمدید کند، این تخفیف اعمال می‌شود.
+                </CardDescription>
               </CardHeader>
               <CardContent className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2">
                 <div className="flex flex-col gap-1.5">
@@ -802,7 +805,7 @@ function AdminPlansInner({ navigate: _navigate }: AdminPlansViewProps) {
                   />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <Label htmlFor="p-rw">پنجرهٔ تمدید (روز)</Label>
+                  <Label htmlFor="p-rw">مدت زمانی قبل از پایان (روز)</Label>
                   <Input
                     id="p-rw"
                     type="number"
@@ -831,7 +834,7 @@ function AdminPlansInner({ navigate: _navigate }: AdminPlansViewProps) {
 
             {/* ---------- ITEM 31: Granular features ---------- */}
             <div className="flex flex-col gap-1.5">
-              <Label>امکانات (سطح پلن)</Label>
+              <Label>امکانات این اشتراک</Label>
               <Accordion
                 type="multiple"
                 defaultValue={["publishing", "ai"]}
@@ -880,7 +883,7 @@ function AdminPlansInner({ navigate: _navigate }: AdminPlansViewProps) {
             {/* ---------- Legacy quota JSON (advanced) ---------- */}
             <details className="rounded-md border border-dashed p-3 text-sm">
               <summary className="cursor-pointer font-medium text-muted-foreground">
-                سهمیهٔ قدیمی (JSON) — برای سازگاری با موتور سهمیه
+                تنظیمات پیشرفته (فقط برای سازگاری با نسخه‌های قدیمی)
               </summary>
               <Textarea
                 rows={5}
@@ -890,8 +893,8 @@ function AdminPlansInner({ navigate: _navigate }: AdminPlansViewProps) {
                 onChange={(e) => setForm({ ...form, quotaJson: e.target.value })}
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                موتور قدیمی سهمیه از این JSON می‌خواند؛ تنظیم امکانات بالا منبع جدید
-                کنترل دسترسی ماژول‌ها است.
+                این قسمت فقط برای سازگاری با نسخه‌های قدیمی است. تنظیم امکانات بالا
+                منبع اصلی کنترل دسترسی ماژول‌هاست.
               </p>
             </details>
 

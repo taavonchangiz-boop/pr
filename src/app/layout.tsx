@@ -67,10 +67,10 @@ const jsonLd = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="fa-IR" dir="rtl" suppressHydrationWarning>
-      <body className="font-sans antialiased bg-background text-foreground">
+      <body className="font-sans antialiased bg-background text-foreground" dir="rtl">
         <Providers>
-          <div className="app-shell">
-            <main>{children}</main>
+          <div className="app-shell" dir="rtl">
+            <main dir="rtl">{children}</main>
           </div>
         </Providers>
         <Toaster />

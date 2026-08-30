@@ -10,7 +10,7 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { requireRole, clientIp, audit, AuthError } from "@/lib/server/auth";
 
-const KINDS = ["sticky_bar", "banner_inline", "sidebar_card", "fullscreen"] as const;
+const KINDS = ["sticky_bar", "banner_inline", "sidebar_card", "fullscreen", "slider"] as const;
 
 type Params = { params: Promise<{ id: string }> };
 
@@ -20,8 +20,19 @@ const PatchSchema = z.object({
   kind: z.enum(KINDS).optional(),
   active: z.boolean().optional(),
   sortOrder: z.number().int().optional(),
+  recommendedWidth: z.number().int().min(0).max(8000).optional(),
+  recommendedHeight: z.number().int().min(0).max(8000).optional(),
+  maxFileBytes: z.number().int().min(0).max(20 * 1024 * 1024).optional(),
 }).refine(
-  (b) => b.labelFa !== undefined || b.descriptionFa !== undefined || b.kind !== undefined || b.active !== undefined || b.sortOrder !== undefined,
+  (b) =>
+    b.labelFa !== undefined ||
+    b.descriptionFa !== undefined ||
+    b.kind !== undefined ||
+    b.active !== undefined ||
+    b.sortOrder !== undefined ||
+    b.recommendedWidth !== undefined ||
+    b.recommendedHeight !== undefined ||
+    b.maxFileBytes !== undefined,
   { message: "هیچ فیلدی برای به‌روزرسانی ارسال نشده است." },
 );
 
@@ -53,6 +64,9 @@ export async function PATCH(req: Request, { params }: Params) {
   if (parsed.data.kind !== undefined) data.kind = parsed.data.kind;
   if (parsed.data.active !== undefined) data.active = parsed.data.active;
   if (parsed.data.sortOrder !== undefined) data.sortOrder = parsed.data.sortOrder;
+  if (parsed.data.recommendedWidth !== undefined) data.recommendedWidth = parsed.data.recommendedWidth;
+  if (parsed.data.recommendedHeight !== undefined) data.recommendedHeight = parsed.data.recommendedHeight;
+  if (parsed.data.maxFileBytes !== undefined) data.maxFileBytes = parsed.data.maxFileBytes;
 
   try {
     const updated = await db.adPlacement.update({ where: { key }, data });

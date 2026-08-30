@@ -77,6 +77,7 @@ import {
 } from "@/components/ui/tabs";
 import { api, type AdminAdRow } from "@/components/postyar/api";
 import { AdminGate } from "@/components/postyar/admin/gate";
+import { AdPreview, adKindLabelFa, type AdPreviewPlacement } from "@/components/postyar/advertising/preview";
 import { formatJalaliDate, toPersianDigits } from "@/lib/persian";
 
 // ---------------------------------------------------------------------
@@ -89,6 +90,9 @@ interface AdPlacementRow {
   kind: string;
   active: boolean;
   sortOrder: number;
+  recommendedWidth: number;
+  recommendedHeight: number;
+  maxFileBytes: number;
   createdAt: string;
   updatedAt: string;
   campaignCount: number;
@@ -99,7 +103,10 @@ const KIND_OPTIONS: Array<{ value: string; label: string }> = [
   { value: "banner_inline", label: "بنر درون‌خطی" },
   { value: "sidebar_card", label: "کارت کناری" },
   { value: "fullscreen", label: "تمام‌صفحه" },
+  { value: "slider", label: "اسلایدر" },
 ];
+
+const SLIDER_HINT = "اسلایدر چرخشی — هر اسلاید تصویری بزرگ با متن روی آن";
 
 function kindLabelFa(k: string): string {
   return KIND_OPTIONS.find((o) => o.value === k)?.label ?? k;
@@ -125,6 +132,7 @@ async function fetchPlacements(): Promise<AdPlacementRow[]> {
 async function createPlacement(body: {
   key: string; labelFa: string; descriptionFa?: string;
   kind: string; active: boolean; sortOrder: number;
+  recommendedWidth?: number; recommendedHeight?: number; maxFileBytes?: number;
 }): Promise<AdPlacementRow> {
   const r = await fetch("/api/admin/ads/placements", {
     method: "POST",
@@ -138,7 +146,7 @@ async function createPlacement(body: {
 }
 async function updatePlacement(
   key: string,
-  body: Partial<Pick<AdPlacementRow, "labelFa" | "descriptionFa" | "kind" | "active" | "sortOrder">>,
+  body: Partial<Pick<AdPlacementRow, "labelFa" | "descriptionFa" | "kind" | "active" | "sortOrder" | "recommendedWidth" | "recommendedHeight" | "maxFileBytes">>,
 ): Promise<AdPlacementRow> {
   const r = await fetch(`/api/admin/ads/placements/${encodeURIComponent(key)}`, {
     method: "PATCH",
@@ -367,17 +375,24 @@ function AdminAdsInner({ navigate: _navigate }: AdminAdsViewProps) {
 
       {/* ============ Campaign view dialog ============ */}
       <Dialog open={!!view} onOpenChange={(o) => !o && setView(null)}>
-        <DialogContent dir="rtl" className="sm:max-w-md">
+        <DialogContent dir="rtl" className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>{view?.title}</DialogTitle>
             <DialogDescription>
               {view?.ownerName ?? "—"} • {view?.placement}
             </DialogDescription>
           </DialogHeader>
-          {view?.imageUrl && (
-            <img src={view.imageUrl} alt={view.title} className="h-40 w-full rounded-md object-cover" />
+          {view && (
+            <AdPreview
+              data={{
+                title: view.title,
+                descriptionFa: view.descriptionFa ?? "",
+                link: view.link ?? "",
+                imageUrl: view.imageUrl ?? null,
+                placement: (placements.find((p) => p.key === view.placement) as AdPreviewPlacement | undefined) ?? null,
+              }}
+            />
           )}
-          <div className="text-sm text-muted-foreground">{view?.descriptionFa}</div>
           {view?.link && (
             <a href={view.link} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-primary" dir="ltr">
               <ExternalLinkIcon className="size-3.5" /> {view.link}
@@ -387,6 +402,14 @@ function AdminAdsInner({ navigate: _navigate }: AdminAdsViewProps) {
             <Badge variant="outline">نمایش: {toPersianDigits(view?.impressions ?? 0)}</Badge>
             <Badge variant="outline">کلیک: {toPersianDigits(view?.clicks ?? 0)}</Badge>
             {view && statusBadge(view.status)}
+            {view && (() => {
+              const p = placements.find((x) => x.key === view.placement);
+              return p ? (
+                <Badge variant="outline" className="text-[10px]">
+                  {adKindLabelFa(p.kind)}
+                </Badge>
+              ) : null;
+            })()}
           </div>
 
           {/* Placement assignment — only meaningful before approval */}
@@ -541,6 +564,7 @@ function PlacementsManager({
                   <TableHead>کلید</TableHead>
                   <TableHead>برچسب</TableHead>
                   <TableHead>نوع</TableHead>
+                  <TableHead>سایز پیشنهادی</TableHead>
                   <TableHead>ترتیب</TableHead>
                   <TableHead>کمپین‌ها</TableHead>
                   <TableHead>وضعیت</TableHead>
@@ -554,6 +578,21 @@ function PlacementsManager({
                     <TableCell className="font-medium">{p.labelFa}</TableCell>
                     <TableCell>
                       <Badge variant="outline">{kindLabelFa(p.kind)}</Badge>
+                      {p.kind === "slider" && (
+                        <div className="mt-1 text-[10px] text-muted-foreground">{SLIDER_HINT}</div>
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="tabular-nums">
+                        {p.recommendedWidth > 0 && p.recommendedHeight > 0
+                          ? `${toPersianDigits(p.recommendedWidth)}×${toPersianDigits(p.recommendedHeight)} پیکسل`
+                          : "—"}
+                      </Badge>
+                      {p.maxFileBytes > 0 && (
+                        <div className="mt-1 text-[10px] text-muted-foreground">
+                          حداکثر {toPersianDigits((p.maxFileBytes / (1024 * 1024)).toFixed(1))} مگابایت
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className="tabular-nums text-xs">{toPersianDigits(p.sortOrder)}</TableCell>
                     <TableCell className="tabular-nums text-xs">{toPersianDigits(p.campaignCount)}</TableCell>
@@ -664,6 +703,9 @@ function PlacementFormDialog({
     kind: string;
     active: boolean;
     sortOrder: number;
+    recommendedWidth: number;
+    recommendedHeight: number;
+    maxFileBytes: number;
   }) => void;
   pending: boolean;
 }) {
@@ -673,6 +715,15 @@ function PlacementFormDialog({
   const [kind, setKind] = useState<string>(initial?.kind ?? "banner_inline");
   const [active, setActive] = useState<boolean>(initial?.active ?? true);
   const [sortOrder, setSortOrder] = useState<number>(initial?.sortOrder ?? 0);
+  const [recommendedWidth, setRecommendedWidth] = useState<number>(initial?.recommendedWidth ?? 0);
+  const [recommendedHeight, setRecommendedHeight] = useState<number>(initial?.recommendedHeight ?? 0);
+  // Stored as MiB on the form side (the user-facing label is «مگابایت»); converted
+  // to bytes on submit so the API's `maxFileBytes` Int stays in the canonical unit.
+  const [maxFileMiB, setMaxFileMiB] = useState<number>(
+    initial?.maxFileBytes && initial.maxFileBytes > 0
+      ? +(initial.maxFileBytes / (1024 * 1024)).toFixed(2)
+      : 0,
+  );
 
   // When the dialog opens (false→true), resync the form fields from `initial`.
   // For create mode the form is reset to defaults; for edit mode it loads the
@@ -687,6 +738,13 @@ function PlacementFormDialog({
       setKind(initial.kind);
       setActive(initial.active);
       setSortOrder(initial.sortOrder);
+      setRecommendedWidth(initial.recommendedWidth);
+      setRecommendedHeight(initial.recommendedHeight);
+      setMaxFileMiB(
+        initial.maxFileBytes && initial.maxFileBytes > 0
+          ? +(initial.maxFileBytes / (1024 * 1024)).toFixed(2)
+          : 0,
+      );
     } else if (mode === "create") {
       setKey("");
       setLabelFa("");
@@ -694,6 +752,9 @@ function PlacementFormDialog({
       setKind("banner_inline");
       setActive(true);
       setSortOrder(0);
+      setRecommendedWidth(0);
+      setRecommendedHeight(0);
+      setMaxFileMiB(0);
     }
   }, [open, mode, initial]);
 
@@ -714,6 +775,11 @@ function PlacementFormDialog({
       kind,
       active,
       sortOrder: Number.isFinite(sortOrder) ? Math.trunc(sortOrder) : 0,
+      recommendedWidth: Number.isFinite(recommendedWidth) ? Math.max(0, Math.trunc(recommendedWidth)) : 0,
+      recommendedHeight: Number.isFinite(recommendedHeight) ? Math.max(0, Math.trunc(recommendedHeight)) : 0,
+      maxFileBytes: Number.isFinite(maxFileMiB) && maxFileMiB > 0
+        ? Math.min(20 * 1024 * 1024, Math.trunc(maxFileMiB * 1024 * 1024))
+        : 0,
     });
   }
 
@@ -779,6 +845,9 @@ function PlacementFormDialog({
                   ))}
                 </SelectContent>
               </Select>
+              {kind === "slider" && (
+                <p className="text-[11px] text-muted-foreground">{SLIDER_HINT}</p>
+              )}
             </div>
             <div className="flex flex-col gap-1.5">
               <Label htmlFor="pl-order">ترتیب نمایش</Label>
@@ -803,6 +872,48 @@ function PlacementFormDialog({
               </div>
             </div>
           </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="pl-rw">عرض پیشنهادی (px)</Label>
+              <Input
+                id="pl-rw"
+                type="number"
+                value={recommendedWidth}
+                onChange={(e) => setRecommendedWidth(Number(e.target.value))}
+                disabled={pending}
+                min={0}
+                max={8000}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="pl-rh">ارتفاع پیشنهادی (px)</Label>
+              <Input
+                id="pl-rh"
+                type="number"
+                value={recommendedHeight}
+                onChange={(e) => setRecommendedHeight(Number(e.target.value))}
+                disabled={pending}
+                min={0}
+                max={8000}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="pl-mb">حداکثر حجم فایل (مگابایت)</Label>
+              <Input
+                id="pl-mb"
+                type="number"
+                value={maxFileMiB}
+                onChange={(e) => setMaxFileMiB(Number(e.target.value))}
+                disabled={pending}
+                min={0}
+                max={20}
+                step={0.5}
+              />
+            </div>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            صفر یعنی «بدون محدودیت». این مقادیر هنگام ساخت کمپین به کاربر نمایش داده می‌شوند.
+          </p>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               انصراف

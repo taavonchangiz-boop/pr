@@ -20,6 +20,7 @@ import {
   ChevronRightIcon,
   KeyRoundIcon,
   Loader2Icon,
+  LockIcon,
   SearchIcon,
   ShieldIcon,
   UserCogIcon,
@@ -46,6 +47,11 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -81,6 +87,28 @@ function statusBadge(status: string) {
   if (status === "active") return <Badge variant="default">فعال</Badge>;
   if (status === "suspended") return <Badge variant="destructive">معلق</Badge>;
   return <Badge variant="outline">{status}</Badge>;
+}
+
+/**
+ * Small lock badge shown next to the role of the bootstrap (super-admin)
+ * user. It carries a tooltip «مدیر کل — قفل» so other admins understand why
+ * all the row's action buttons are disabled.
+ */
+function SuperAdminLockBadge() {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span
+          tabIndex={0}
+          className="inline-flex cursor-default items-center gap-1 rounded-md border border-dashed bg-muted/40 px-1.5 py-0.5 text-[10px] text-muted-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+        >
+          <LockIcon className="size-3" />
+          مدیر کل
+        </span>
+      </TooltipTrigger>
+      <TooltipContent side="top" dir="rtl">مدیر کل — قفل</TooltipContent>
+    </Tooltip>
+  );
 }
 
 export interface AdminUsersViewProps {
@@ -179,7 +207,9 @@ function AdminUsersInner({ navigate: _navigate }: AdminUsersViewProps) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((u: AdminUserRow) => (
+                  {users.map((u: AdminUserRow) => {
+                    const locked = !!u.isSuperAdmin;
+                    return (
                     <TableRow key={u.id}>
                       <TableCell>
                         <div className="font-medium">{u.firstName} {u.lastName}</div>
@@ -188,34 +218,66 @@ function AdminUsersInner({ navigate: _navigate }: AdminUsersViewProps) {
                       <TableCell dir="ltr" className="text-xs">{u.email}</TableCell>
                       <TableCell dir="ltr" className="text-xs">{u.mobileMasked}</TableCell>
                       <TableCell>
-                        <Select
-                          value={u.role}
-                          onValueChange={(v) => setRoleChange({ id: u.id, role: v as "user" | "support" | "admin" })}
-                        >
-                          <SelectTrigger className="w-28 h-8 text-xs cursor-pointer focus-visible:ring-2 focus-visible:ring-ring"><SelectValue /></SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="user">کاربر</SelectItem>
-                            <SelectItem value="support">پشتیبان</SelectItem>
-                            <SelectItem value="admin">مدیر</SelectItem>
-                          </SelectContent>
-                        </Select>
+                        <div className="flex items-center gap-2">
+                          <Select
+                            value={u.role}
+                            disabled={locked}
+                            onValueChange={(v) => setRoleChange({ id: u.id, role: v as "user" | "support" | "admin" })}
+                          >
+                            <SelectTrigger
+                              className="w-28 h-8 text-xs focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                              aria-label={locked ? "نقش مدیر کل قفل است" : "تغییر نقش کاربر"}
+                            >
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="user">کاربر</SelectItem>
+                              <SelectItem value="support">پشتیبان</SelectItem>
+                              <SelectItem value="admin">مدیر</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          {locked && <SuperAdminLockBadge />}
+                        </div>
                       </TableCell>
                       <TableCell>{statusBadge(u.status)}</TableCell>
                       <TableCell className="text-xs text-muted-foreground">{u.createdAtFa}</TableCell>
                       <TableCell>
                         <div className="flex justify-end gap-1">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => setPwReset({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email })}
-                            disabled={!!me && me.id === u.id}
-                            title={me && me.id === u.id ? "برای تغییر رمز خود از پروفایل استفاده کنید" : "بازنشانی رمز عبور کاربر"}
-                            className="gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
-                          >
-                            <KeyRoundIcon className="size-3.5" />
-                            تغییر رمز
-                          </Button>
-                          {u.status === "active" ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span tabIndex={locked ? 0 : -1} className="inline-flex">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setPwReset({ id: u.id, name: `${u.firstName} ${u.lastName}`.trim() || u.email })}
+                                  disabled={locked || (!!me && me.id === u.id)}
+                                  title={locked ? "حساب مدیر کل قابل تغییر نیست" : (me && me.id === u.id ? "برای تغییر رمز خود از پروفایل استفاده کنید" : "بازنشانی رمز عبور کاربر")}
+                                  className="gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                >
+                                  {locked ? <LockIcon className="size-3.5" /> : <KeyRoundIcon className="size-3.5" />}
+                                  تغییر رمز
+                                </Button>
+                              </span>
+                            </TooltipTrigger>
+                            {locked && <TooltipContent side="top" dir="rtl">مدیر کل — قفل</TooltipContent>}
+                          </Tooltip>
+                          {locked ? (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span tabIndex={0} className="inline-flex">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled
+                                    className="gap-1.5 cursor-not-allowed focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                                  >
+                                    <LockIcon className="size-3.5" /> تعلیق
+                                  </Button>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent side="top" dir="rtl">مدیر کل — قفل</TooltipContent>
+                            </Tooltip>
+                          ) : u.status === "active" ? (
                             <Button
                               variant="outline"
                               size="sm"
@@ -237,7 +299,8 @@ function AdminUsersInner({ navigate: _navigate }: AdminUsersViewProps) {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </div>

@@ -272,7 +272,9 @@ export function Landing({ navigate }: LandingProps) {
               <img
                 src="/brand/postyar.webp"
                 alt="نمای داشبورد پُست‌یار"
-                className="w-full rounded-md border border-white/10"
+                className="block w-full rounded-md border border-white/10 object-cover aspect-[16/10] sm:aspect-[16/9] lg:aspect-[16/10]"
+                loading="lazy"
+                decoding="async"
               />
 
               {/* floating stat — کاربران فعال (top-right) */}
@@ -445,7 +447,9 @@ export function Landing({ navigate }: LandingProps) {
             <img
               src="/brand/asovin.webp"
               alt="نمای برند پُست‌یار"
-              className="w-full rounded-2xl border border-white/10 shadow-2xl shadow-[#070b16]"
+              className="block w-full rounded-2xl border border-white/10 shadow-2xl shadow-[#070b16] object-cover aspect-[16/10] sm:aspect-[16/9] lg:aspect-[2/1]"
+              loading="lazy"
+              decoding="async"
             />
           </div>
           {/* text */}

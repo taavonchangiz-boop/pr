@@ -31,6 +31,7 @@ export default function Error({
   return (
     <div
       className="flex min-h-[70vh] flex-col items-center justify-center gap-6 px-4 py-16 text-center"
+      dir="rtl"
       role="alert"
       aria-live="assertive"
     >

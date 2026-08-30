@@ -108,6 +108,7 @@ export async function createTicket(input: {
   subject: string;
   category?: TicketCategory;
   priority?: TicketPriority;
+  departmentId?: string | null;
   body: string;
   ip?: string;
 }): Promise<{ ok: boolean; ticket?: TicketView; errorFa?: string }> {
@@ -116,6 +117,15 @@ export async function createTicket(input: {
   if (subject.length < 3) return { ok: false, errorFa: "موضوع تیکت حداقل باید ۳ نویسه باشد." };
   if (body.length < 3) return { ok: false, errorFa: "متن تیکت حداقل باید ۳ نویسه باشد." };
 
+  // Optional department assignment — validate FK exists + is active.
+  let departmentId: string | null = null;
+  if (input.departmentId !== undefined && input.departmentId !== null && input.departmentId !== "") {
+    const dep = await db.ticketDepartment.findUnique({ where: { id: input.departmentId } });
+    if (!dep) return { ok: false, errorFa: "دپارتمان انتخاب‌شده یافت نشد." };
+    if (!dep.active) return { ok: false, errorFa: "دپارتمان انتخاب‌شده غیرفعال است." };
+    departmentId = dep.id;
+  }
+
   const ticket = await db.ticket.create({
     data: {
       userId: input.userId,
@@ -123,6 +133,7 @@ export async function createTicket(input: {
       category: input.category ?? "general",
       priority: input.priority ?? "normal",
       status: "open",
+      departmentId,
       replies: {
         create: {
           userId: input.userId,
@@ -134,6 +145,7 @@ export async function createTicket(input: {
     include: {
       user: { select: { id: true, firstName: true, lastName: true, businessName: true } },
       assignedTo: { select: { id: true, firstName: true, lastName: true } },
+      department: { select: { id: true, nameFa: true } },
       replies: true,
     },
   });
@@ -145,7 +157,7 @@ export async function createTicket(input: {
     targetType: "ticket",
     targetId: ticket.id,
     ip: input.ip,
-    meta: { category: ticket.category, priority: ticket.priority },
+    meta: { category: ticket.category, priority: ticket.priority, departmentId },
   });
 
   return { ok: true, ticket: toView(ticket) };
@@ -464,8 +476,13 @@ async function ensureTicketStorage(ticketId: string): Promise<string> {
   return dir;
 }
 
-export async function listDepartments(): Promise<{ items: TicketDepartmentView[] }> {
+export async function listDepartments(
+  opts?: { activeOnly?: boolean },
+): Promise<{ items: TicketDepartmentView[] }> {
+  const where: Record<string, unknown> = {};
+  if (opts?.activeOnly) where.active = true;
   const rows = await db.ticketDepartment.findMany({
+    where,
     orderBy: [{ priority: "asc" }, { nameFa: "asc" }],
     include: { _count: { select: { tickets: true } } },
   });

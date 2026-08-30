@@ -9,7 +9,8 @@ const CreateSchema = z.object({
   subject: z.string().min(3).max(200),
   body: z.string().min(3).max(8000),
   category: z.enum(["general", "billing", "technical", "ai", "gold", "woo", "bot", "security"]).optional(),
-  priority: z.enum(["low", "normal", "high"]).optional(),
+  priority: z.enum(["low", "normal", "high", "urgent"]).optional(),
+  departmentId: z.string().min(1).nullable().optional(),
 });
 
 export async function GET(req: Request) {
@@ -52,6 +53,7 @@ export async function POST(req: Request) {
     body: parsed.data.body,
     category: parsed.data.category as TicketCategory | undefined,
     priority: parsed.data.priority as TicketPriority | undefined,
+    departmentId: parsed.data.departmentId ?? undefined,
     ip,
   });
   if (!r.ok || !r.ticket) {

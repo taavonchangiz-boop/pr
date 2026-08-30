@@ -17,6 +17,126 @@ import { formatRials } from "@/lib/persian";
 
 const ADS_DIR = path.resolve(process.cwd(), "public", "assets", "ads");
 
+// Default placements — auto-seeded on first ad create so the FK from
+// AdCampaign.placement → AdPlacement.key always finds a valid target.
+// `kind` mirrors the values used by the admin placement editor.
+export const DEFAULT_AD_PLACEMENTS: Array<{
+  key: string;
+  labelFa: string;
+  descriptionFa: string;
+  kind: string;
+  recommendedWidth: number;
+  recommendedHeight: number;
+  sortOrder: number;
+}> = [
+  {
+    key: "user_dashboard_top",
+    labelFa: "بالای داشبورد کاربر",
+    descriptionFa: "نوار بنری افقی در بالای محتوای اصلی داشبورد کاربر.",
+    kind: "banner_inline",
+    recommendedWidth: 1200,
+    recommendedHeight: 240,
+    sortOrder: 10,
+  },
+  {
+    key: "user_dashboard_sidebar",
+    labelFa: "کنار داشبورد کاربر",
+    descriptionFa: "کارت عمودی در پایین نوار کناری داشبورد کاربر.",
+    kind: "sidebar_card",
+    recommendedWidth: 480,
+    recommendedHeight: 600,
+    sortOrder: 20,
+  },
+  {
+    key: "sticky_bar",
+    labelFa: "نوار چسبان بالا",
+    descriptionFa: "نوار باریک چسبان در بالای صفحه؛ قابل بستن توسط کاربر.",
+    kind: "sticky_bar",
+    recommendedWidth: 1200,
+    recommendedHeight: 90,
+    sortOrder: 30,
+  },
+  {
+    key: "landing_hero",
+    labelFa: "بنر هیرو لندینگ",
+    descriptionFa: "بنر بزرگ بالای صفحهٔ اصلی (فقط برای نمایش همگانی).",
+    kind: "banner_inline",
+    recommendedWidth: 1600,
+    recommendedHeight: 500,
+    sortOrder: 40,
+  },
+  {
+    key: "plans_page_banner",
+    labelFa: "بنر صفحهٔ پلن‌ها",
+    descriptionFa: "بنر افقی در بالای فهرست پلن‌ها.",
+    kind: "banner_inline",
+    recommendedWidth: 1200,
+    recommendedHeight: 200,
+    sortOrder: 50,
+  },
+  {
+    key: "slider_main",
+    labelFa: "اسلایدر اصلی",
+    descriptionFa: "اسلایدر چرخشی صفحهٔ اصلی با چند اسلاید؛ هر اسلاید تصویری بزرگ.",
+    kind: "slider",
+    recommendedWidth: 1600,
+    recommendedHeight: 600,
+    sortOrder: 60,
+  },
+];
+
+let seedPlacementsPromise: Promise<void> | null = null;
+
+/** Idempotent — safe to call on every ad create. Inserts default placements
+ *  if missing; never overwrites admin edits (labelFa/descriptionFa/active/
+ *  sortOrder stay admin-owned on update). For the recommended-size + max-
+ *  file-bytes fields, we ONLY seed them when the admin hasn't already set a
+ *  non-zero value, so the default placements get their recommended sizes
+ *  (1200×240 etc.) on first run but admin edits win afterward. */
+export function ensureAdPlacementsSeeded(): Promise<void> {
+  if (seedPlacementsPromise) return seedPlacementsPromise;
+  seedPlacementsPromise = (async () => {
+    for (const p of DEFAULT_AD_PLACEMENTS) {
+      await db.adPlacement.upsert({
+        where: { key: p.key },
+        create: {
+          key: p.key,
+          labelFa: p.labelFa,
+          descriptionFa: p.descriptionFa,
+          kind: p.kind,
+          active: true,
+          sortOrder: p.sortOrder,
+          recommendedWidth: p.recommendedWidth,
+          recommendedHeight: p.recommendedHeight,
+          maxFileBytes: 5 * 1024 * 1024,
+        },
+        update: {
+          // Keep label in sync only if admin hasn't renamed. We deliberately
+          // don't overwrite descriptionFa / kind / active / sortOrder / sizes
+          // so the admin's edits win. The recommended sizes are backfilled
+          // in the next step ONLY when they're still 0.
+          labelFa: p.labelFa,
+        },
+      });
+      // One-shot backfill: if the row pre-existed (created before the size
+      // fields existed) and the admin hasn't set them, write them now.
+      // Skipped if the admin already configured them (non-zero).
+      const existing = await db.adPlacement.findUnique({ where: { key: p.key }, select: { recommendedWidth: true, recommendedHeight: true, maxFileBytes: true } });
+      if (existing && (existing.recommendedWidth === 0 || existing.recommendedHeight === 0 || existing.maxFileBytes === 0)) {
+        await db.adPlacement.update({
+          where: { key: p.key },
+          data: {
+            recommendedWidth: existing.recommendedWidth === 0 ? p.recommendedWidth : undefined,
+            recommendedHeight: existing.recommendedHeight === 0 ? p.recommendedHeight : undefined,
+            maxFileBytes: existing.maxFileBytes === 0 ? 5 * 1024 * 1024 : undefined,
+          },
+        });
+      }
+    }
+  })();
+  return seedPlacementsPromise;
+}
+
 async function ensureAdsDir(): Promise<void> {
   try {
     await fs.mkdir(ADS_DIR, { recursive: true });
@@ -120,6 +240,26 @@ export async function createAdDraft(input: {
   if (!input.title || input.title.trim().length < 3) {
     throw new AuthError("عنوان تبلیغ حداقل ۳ نویسه باشد.", 400);
   }
+  // Make sure default placements exist before we try to attach a campaign
+  // to one. This is the FK-violation hotfix: previously, the user could
+  // POST a campaign with a placement that wasn't yet in AdPlacement.
+  await ensureAdPlacementsSeeded();
+  const placementKey = (input.placement ?? "user_dashboard_top").trim();
+  // Validate the placement FK exists; if the admin deleted the default,
+  // we still create it on demand so the user is never blocked.
+  let placement = await db.adPlacement.findUnique({ where: { key: placementKey } });
+  if (!placement) {
+    placement = await db.adPlacement.create({
+      data: {
+        key: placementKey,
+        labelFa: placementKey,
+        descriptionFa: "جایگاه تبلیغاتی تعریف‌شده توسط کاربر.",
+        kind: "banner_inline",
+        active: true,
+        sortOrder: 1000,
+      },
+    });
+  }
   let imagePath: string | null = null;
   if (input.imageBuffer && input.imageBuffer.byteLength > 0) {
     if (input.imageBuffer.byteLength > 5 * 1024 * 1024) {
@@ -135,7 +275,7 @@ export async function createAdDraft(input: {
       descriptionFa: (input.descriptionFa ?? "").slice(0, 1000),
       link: input.link?.slice(0, 500) ?? null,
       imagePath,
-      placement: input.placement ?? "site_sidebar",
+      placement: placement.key,
       startAt: input.startAt ?? null,
       endAt: input.endAt ?? null,
       priceRials: input.priceRials ?? 0,

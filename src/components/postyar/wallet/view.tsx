@@ -62,10 +62,7 @@ function BalanceCard({
       </CardHeader>
       <CardContent className="flex flex-wrap gap-2">
         <Button
-          onClick={() => {
-            toast.success("برای شارژ کیف پول، یک پلن یا بستهٔ اعتباری انتخاب کنید.");
-            navigate("/dashboard/plans");
-          }}
+          onClick={() => navigate("/dashboard/payment")}
           className="gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <PlusIcon className="size-4" />
@@ -78,7 +75,7 @@ function BalanceCard({
           className="gap-2 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
         >
           <ArrowUpRightIcon className="size-4" />
-          انتقال به اشتراک
+          انتخاب اشتراک
         </Button>
         <Button
           variant="outline"

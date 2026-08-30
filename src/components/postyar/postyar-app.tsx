@@ -66,7 +66,7 @@ export function PostyarApp() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="min-h-screen flex items-center justify-center" dir="rtl">
         <div className="text-muted-foreground animate-pulse">در حال بارگذاری پُست‌یار…</div>
       </div>
     );

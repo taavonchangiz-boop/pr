@@ -4,12 +4,63 @@ import { requireRole, AuthError } from "@/lib/server/auth";
 import { db } from "@/lib/db";
 import { formatJalaliDateTime, maskMobile, maskToken } from "@/lib/persian";
 
+// ---------------------------------------------------------------------
+// SUPER-ADMIN column was added to the User model in this iteration. We
+// read & write it via raw SQL ($queryRaw / $executeRaw) so the route
+// works even while a long-lived Next.js dev server still has the
+// pre-migration @prisma/client singleton in its require cache. The
+// typed Prisma client API gains `isSuperAdmin` automatically on the
+// next server restart — these helpers remain a safe, schema-aware
+// fallback forever.
+// ---------------------------------------------------------------------
+
+interface SuperAdminRow {
+  id: string;
+  isSuperAdmin: number;
+}
+
+async function readSuperAdminFlags(ids: string[]): Promise<Map<string, boolean>> {
+  const out = new Map<string, boolean>();
+  if (ids.length === 0) return out;
+  const rows = await db.$queryRawUnsafe<SuperAdminRow[]>(
+    `SELECT id, isSuperAdmin FROM User WHERE id IN (${ids.map(() => "?").join(",")})`,
+    ...ids,
+  );
+  for (const r of rows) out.set(r.id, !!r.isSuperAdmin);
+  return out;
+}
+
+/**
+ * One-shot backfill: ensure there is exactly one super-admin in the system.
+ * The bootstrap admin (the earliest-created admin) is the only user that
+ * should have `isSuperAdmin === true`. If no super-admin exists yet (e.g.
+ * the dev DB predates the column), promote the earliest admin. This runs
+ * lazily on the first admin-only GET and is a no-op afterwards.
+ */
+async function ensureSuperAdminBackfill(): Promise<void> {
+  const existing = await db.$queryRawUnsafe<SuperAdminRow[]>(
+    `SELECT id FROM User WHERE isSuperAdmin = 1 LIMIT 1`,
+  );
+  if (existing.length > 0) return;
+  const earliestAdmin = await db.user.findFirst({
+    where: { role: "admin" },
+    orderBy: { createdAt: "asc" },
+    select: { id: true },
+  });
+  if (!earliestAdmin) return;
+  await db.$executeRawUnsafe(
+    `UPDATE User SET isSuperAdmin = 1 WHERE id = ?`,
+    earliestAdmin.id,
+  );
+}
+
 export async function GET(req: Request) {
   let user;
   try { user = await requireRole(["admin"]); } catch (e) {
     return NextResponse.json({ errorFa: (e as AuthError).message }, { status: (e as AuthError).status });
   }
   void user;
+  await ensureSuperAdminBackfill();
   const url = new URL(req.url);
   const search = url.searchParams.get("search") ?? "";
   const status = url.searchParams.get("status") ?? undefined;
@@ -55,6 +106,10 @@ export async function GET(req: Request) {
     db.user.count({ where }),
   ]);
 
+  // Merge the isSuperAdmin flag from raw SQL — bypasses the cached Prisma
+  // client that may predate the isSuperAdmin column.
+  const saMap = await readSuperAdminFlags(rows.map((u) => u.id));
+
   return NextResponse.json({
     items: rows.map((u) => ({
       id: u.id,
@@ -70,6 +125,7 @@ export async function GET(req: Request) {
       referredById: u.referredById ?? null,
       createdAt: u.createdAt.toISOString(),
       createdAtFa: formatJalaliDateTime(u.createdAt, { withTime: true }),
+      isSuperAdmin: saMap.get(u.id) ?? false,
     })),
     total,
   });

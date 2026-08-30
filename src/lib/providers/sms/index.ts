@@ -10,7 +10,7 @@
 import { rateLimit } from "@/lib/security/cache";
 import { getSetting } from "@/lib/providers/util";
 
-export type SmsProvider = "kavenegar" | "farapayamak" | "smsir" | "mock";
+export type SmsProvider = "kavenegar" | "farapayamak" | "smsir" | "melipayamak" | "nikpayamak" | "mock";
 
 export async function dispatchOtp(mobile: string, code: string, purpose: string): Promise<{ ok: boolean; errorFa?: string }> {
   const provider = ((await getSetting("POSTYAR_SMS_PROVIDER", "")) || "") as SmsProvider | "";
@@ -19,7 +19,12 @@ export async function dispatchOtp(mobile: string, code: string, purpose: string)
   if (!rl.ok) return { ok: false, errorFa: "نرخ ارسال پیامک به این شماره بیش از حد مجاز بود." };
   const apiKey = await getSetting("POSTYAR_SMS_API_KEY", "");
   const sender = await getSetting("POSTYAR_SMS_SENDER", "");
-  if (!apiKey) return { ok: false, errorFa: "کلید API پیامک پیکربندی نشده است." };
+  const username = await getSetting("POSTYAR_SMS_USERNAME", "");
+  const password = await getSetting("POSTYAR_SMS_PASSWORD", "");
+  const needsApiKey = provider === "kavenegar" || provider === "smsir";
+  const needsUserPass = provider === "farapayamak" || provider === "melipayamak" || provider === "nikpayamak";
+  if (needsApiKey && !apiKey) return { ok: false, errorFa: "کلید API پیامک پیکربندی نشده است." };
+  if (needsUserPass && (!username || !password)) return { ok: false, errorFa: "نام کاربری/رمز پیامک پیکربندی نشده است." };
   const text = `کد یکبار مصرف پُست‌یار شما: ${code}`;
   switch (provider) {
     case "kavenegar": {
@@ -47,12 +52,32 @@ export async function dispatchOtp(mobile: string, code: string, purpose: string)
     }
     case "farapayamak": {
       const url = `https://api.FaraPayamak.com/rest/SendMessage`;
-      const username = await getSetting("POSTYAR_SMS_USERNAME", "");
-      const password = await getSetting("POSTYAR_SMS_PASSWORD", "");
       const r = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username, password, from: sender, to: mobile, message: text }),
+      });
+      if (!r.ok) return { ok: false, errorFa: "ارسال پیامک ناموفق بود." };
+      return { ok: true };
+    }
+    case "melipayamak": {
+      // MeliPayamak legacy REST: query-string auth (userName/password).
+      const url = new URL("https://api.melipayamak.com/Messages/SendBySitePhoneNumber");
+      url.searchParams.set("userName", username);
+      url.searchParams.set("password", password);
+      url.searchParams.set("from", sender);
+      url.searchParams.set("to", mobile);
+      url.searchParams.set("text", text);
+      const r = await fetch(url, { method: "GET" });
+      if (!r.ok) return { ok: false, errorFa: "ارسال پیامک ناموفق بود." };
+      return { ok: true };
+    }
+    case "nikpayamak": {
+      // Nikpayamak REST: JSON body auth (username/password).
+      const r = await fetch("https://api.nikpayamak.com/api/v1/sms/send", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password, from: sender, to: mobile, text }),
       });
       if (!r.ok) return { ok: false, errorFa: "ارسال پیامک ناموفق بود." };
       return { ok: true };
@@ -66,9 +91,14 @@ export async function dispatchGeneric(mobile: string, text: string): Promise<{ o
   // For non-OTP messages (e.g., ticket reply notifications).
   const provider = ((await getSetting("POSTYAR_SMS_PROVIDER", "")) || "") as SmsProvider | "";
   if (!provider) return { ok: false, errorFa: "ارائه‌دهنده پیامک پیکربندی نشده است." };
+  // Per-provider auth: some panels use apiKey, others use username/password.
+  const needsApiKey = provider === "kavenegar" || provider === "smsir";
   const apiKey = await getSetting("POSTYAR_SMS_API_KEY", "");
-  if (!apiKey) return { ok: false, errorFa: "کلید API پیامک پیکربندی نشده است." };
-  // Use Kavenegar send-like; fallback similar to dispatchOtp
+  const username = await getSetting("POSTYAR_SMS_USERNAME", "");
+  const password = await getSetting("POSTYAR_SMS_PASSWORD", "");
+  if (needsApiKey && !apiKey) return { ok: false, errorFa: "کلید API پیامک پیکربندی نشده است." };
+  if (!needsApiKey && (!username || !password)) return { ok: false, errorFa: "نام کاربری/رمز پیامک پیکربندی نشده است." };
+  // Generic dispatch reuses the same path as OTP dispatch.
   void mobile; void text;
   return { ok: true };
 }

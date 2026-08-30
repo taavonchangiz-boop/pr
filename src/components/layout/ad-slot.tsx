@@ -96,6 +96,20 @@ export function AdSlot({ placement, className }: AdSlotProps) {
       </div>
     );
   }
+  // Slider kind: same single-image render as banner_inline, but with rounded
+  // corners + nav-dots underneath to signal "this is a slider slot". Per the
+  // task brief we deliberately do NOT add multi-slide logic — the serve
+  // endpoint returns take=1 for slider placements, so there is exactly one
+  // campaign to render.
+  if (kind === "slider") {
+    return (
+      <div className={cn("flex flex-col gap-3", className)} dir="rtl">
+        {campaigns.map((c) => (
+          <SliderCard key={c.id} campaign={c} />
+        ))}
+      </div>
+    );
+  }
   // Default: banner_inline
   return (
     <div className={cn("flex flex-col gap-3", className)} dir="rtl">
@@ -250,6 +264,66 @@ function FullscreenStrip({ campaign, className }: { campaign: ServedCampaign; cl
   );
 }
 
+function SliderCard({ campaign }: { campaign: ServedCampaign }) {
+  // Slider kind = visually distinct from banner_inline (rounded-2xl + big
+  // image + nav-dots under it) so users notice "this is a slider slot".
+  // Single campaign render per task brief — multi-slide logic is out of scope.
+  return (
+    <a
+      href={campaign.link ?? "#"}
+      target={campaign.link ? "_blank" : undefined}
+      rel={campaign.link ? "noopener noreferrer" : undefined}
+      onClick={() => trackClick(campaign.id)}
+      className="group relative block w-full overflow-hidden rounded-2xl border bg-card text-card-foreground shadow-sm cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none motion-safe:transition-shadow hover:shadow-md"
+      dir="rtl"
+    >
+      {campaign.imagePath ? (
+        <div className="relative">
+          <img
+            src={campaign.imagePath}
+            alt={campaign.title}
+            loading="lazy"
+            className="h-56 w-full object-cover sm:h-72"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/75 via-black/25 to-transparent" />
+          <div className="absolute inset-x-0 bottom-0 flex flex-col gap-1 p-4 text-white">
+            <div className="flex items-center gap-2 text-base font-semibold drop-shadow">
+              <MegaphoneIcon className="size-4 text-white/80" />
+              <span className="truncate">{campaign.title}</span>
+            </div>
+            {campaign.descriptionFa && (
+              <p className="line-clamp-2 text-xs text-white/90 drop-shadow">{campaign.descriptionFa}</p>
+            )}
+            {campaign.link && (
+              <span className="mt-1 inline-flex items-center gap-1 text-xs text-white motion-safe:transition-colors group-hover:underline">
+                مشاهده تبلیغ
+                <ExternalLinkIcon className="size-3" />
+              </span>
+            )}
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-1 p-4">
+          <div className="flex items-center gap-2 text-sm font-medium">
+            <MegaphoneIcon className="size-4 text-muted-foreground" />
+            <span className="truncate">{campaign.title}</span>
+          </div>
+          {campaign.descriptionFa && (
+            <p className="text-xs text-muted-foreground">{campaign.descriptionFa}</p>
+          )}
+        </div>
+      )}
+      {/* Nav-dots — visual cue for the slider kind. Static (no JS) since
+          the serve endpoint returns a single campaign for slider placements. */}
+      <div className="absolute inset-x-0 bottom-2 z-10 flex items-center justify-center gap-1.5" aria-hidden="true">
+        <span className="size-2 rounded-full bg-white" />
+        <span className="size-2 rounded-full bg-white/50" />
+        <span className="size-2 rounded-full bg-white/50" />
+      </div>
+    </a>
+  );
+}
+
 function AdSlotSkeleton({ kind, className }: { kind: string; className?: string }) {
   if (kind === "sidebar_card") {
     return (
@@ -260,6 +334,9 @@ function AdSlotSkeleton({ kind, className }: { kind: string; className?: string 
   }
   if (kind === "fullscreen") {
     return <Skeleton className={cn("h-48 w-full rounded-lg sm:h-64", className)} />;
+  }
+  if (kind === "slider") {
+    return <Skeleton className={cn("h-56 w-full rounded-2xl sm:h-72", className)} />;
   }
   return <Skeleton className={cn("h-32 w-full rounded-lg", className)} />;
 }

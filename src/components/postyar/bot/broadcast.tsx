@@ -22,6 +22,7 @@ import {
   AlertTriangleIcon,
   CheckIcon,
   Loader2Icon,
+  PlusCircleIcon,
   RadioIcon,
   SendIcon,
   UsersIcon,
@@ -57,8 +58,7 @@ function toFa(n: number): string {
   return n.toString().replace(/\d/g, (d) => "۰۱۲۳۴۵۶۷۸۹"[Number(d)]);
 }
 
-export function BotBroadcastView({ botId, navigate: _navigate }: BotBroadcastViewProps) {
-  void _navigate;
+export function BotBroadcastView({ botId, navigate }: BotBroadcastViewProps) {
   const qc = useQueryClient();
   const [message, setMessage] = useState("");
   const [audience, setAudience] = useState(""); // bot-scoped: comma-separated providerUserIds
@@ -193,8 +193,35 @@ export function BotBroadcastView({ botId, navigate: _navigate }: BotBroadcastVie
               ) : destsQ.error ? (
                 <div className="text-xs text-destructive">بارگذاری مقاصد ناموفق بود.</div>
               ) : destinations.length === 0 ? (
-                <div className="rounded-md border border-dashed p-4 text-center text-sm text-muted-foreground">
-                  هنوز مقصدی نساخته‌اید. ابتدا یک مقصد بسازید.
+                <div
+                  dir="rtl"
+                  className="flex flex-col items-center gap-3 rounded-md border border-dashed p-5 text-center cursor-pointer transition-colors hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => navigate("/dashboard/destinations")}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      navigate("/dashboard/destinations");
+                    }
+                  }}
+                >
+                  <PlusCircleIcon className="size-7 text-muted-foreground" />
+                  <div className="text-sm text-muted-foreground">
+                    هنوز مقصدی نساخته‌اید. یک مقصد بسازید.
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate("/dashboard/destinations");
+                    }}
+                    className="gap-1.5 cursor-pointer focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none"
+                  >
+                    <PlusCircleIcon className="size-4" />
+                    ساخت مقصد جدید
+                  </Button>
                 </div>
               ) : (
                 <>

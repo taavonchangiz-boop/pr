@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { hashPassword, newReferralCode, clientIp, audit, createSession } from "@/lib/server/auth";
 import { isValidEmail, isValidIranMobile, normalizeMobile } from "@/lib/persian";
 import { rateLimit } from "@/lib/security/cache";
+import { ensurePlansSeeded } from "@/lib/payments/plans";
 
 const Schema = z.object({
   firstName: z.string().min(2, "نام باید حداقل ۲ نویسه باشد.").max(60),
@@ -57,7 +58,17 @@ export async function POST(req: Request) {
   // Every subsequent registrant is created as a regular user ("user").
   // This guarantees a single, deterministic bootstrap admin with no manual DB edit.
   const userCount = await db.user.count();
-  const role = userCount === 0 ? "admin" : "user";
+  const isFirstAdmin = userCount === 0;
+  const role = isFirstAdmin ? "admin" : "user";
+
+  // Make sure the FREE plan exists before we try to attach a subscription to it.
+  // (plans.ts auto-seeds on import, but we call explicitly to be safe.)
+  await ensurePlansSeeded();
+  const freePlan = await db.plan.findUnique({ where: { code: "free" } });
+
+  const endsAt = new Date();
+  endsAt.setMonth(endsAt.getMonth() + 1); // 1-month rolling free subscription.
+
   const user = await db.user.create({
     data: {
       firstName, lastName,
@@ -69,11 +80,31 @@ export async function POST(req: Request) {
       referralCode: code,
       referredById: referredById ?? null,
       role,
+      isSuperAdmin: isFirstAdmin,
     },
   });
   await db.profile.create({ data: { userId: user.id } });
 
-  await audit({ actor: "user", action: userCount === 0 ? "register_first_admin" : "register", targetType: "user", targetId: user.id, ip, meta: { email, mobile: normMobile, role } });
+  // AUTO-ACTIVATE FREE PLAN on signup — the user gets the free plan
+  // IMMEDIATELY, NO checkout step. The free plan is "locked-by-default":
+  // a user gets exactly ONE free subscription at signup; they cannot re-grant
+  // it later via the plans page (the plans page will show "اشتراک فعال" and
+  // hide the checkout button for the free plan while a free subscription is
+  // still active or even expired-and-renewable).
+  if (freePlan) {
+    await db.subscription.create({
+      data: {
+        userId: user.id,
+        planId: freePlan.id,
+        status: "active",
+        startedAt: new Date(),
+        endsAt,
+        usedQuota: "{}",
+      },
+    });
+  }
+
+  await audit({ actor: "user", action: isFirstAdmin ? "register_first_admin" : "register", targetType: "user", targetId: user.id, ip, meta: { email, mobile: normMobile, role, freePlanActivated: Boolean(freePlan) } });
   // Create a session so the freshly-registered user is immediately logged in.
   await createSession(user.id, ip, req.headers.get("user-agent"));
   return NextResponse.json({ ok: true, userId: user.id, user: { id: user.id, firstName, role: user.role } });
