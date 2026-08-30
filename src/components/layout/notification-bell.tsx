@@ -22,18 +22,50 @@ type Notif = {
 };
 
 /** Hash-route navigate helper (mirrors postyar-app's navigate). Accepts both
- *  "/dashboard/foo" and "dashboard/foo" forms + "#/dashboard/foo". When the
- *  link is missing/empty, falls back to the notifications list view. */
-function navToAction(link: string | null | undefined) {
+ *  "/dashboard/foo" and "dashboard/foo" forms + "#/dashboard/foo".
+ *
+ *  Legacy link normalization: older Notification rows in the DB may carry
+ *  short links like "/wallet" or "/orders" (without the "/dashboard"
+ *  prefix), OR a null link. Without normalization, "/wallet" is parsed by
+ *  the SPA router as an unknown route and falls back to the landing page —
+ *  which is the bug users reported. This helper rewrites those short links
+ *  to their proper "/dashboard/<x>" form based on the notification category
+ *  when the link itself doesn't already start with "/dashboard". When the
+ *  link is missing/empty, it falls back to the notifications list view. */
+const CATEGORY_FALLBACK_VIEW: Record<string, string> = {
+  publish: "/dashboard/content",
+  payment: "/dashboard/wallet",
+  subscription: "/dashboard/subscriptions",
+  referral: "/dashboard/referral",
+  ad: "/dashboard/advertising",
+  ticket: "/dashboard/tickets",
+  gold: "/dashboard/gold",
+  woo: "/dashboard/woo",
+  security: "/dashboard/profile",
+  system: "/dashboard/notifications",
+};
+
+function navToAction(link: string | null | undefined, category?: string | null) {
   const target = (link ?? "").trim();
   if (!target) {
-    window.location.hash = "/dashboard/notifications";
+    // No link stored — fall back to the category's main view, or the
+    // notifications list as a last resort.
+    const fallback = (category && CATEGORY_FALLBACK_VIEW[category]) || "/dashboard/notifications";
+    window.location.hash = fallback;
     return;
   }
   // strip leading "#"
-  const clean = target.replace(/^#/, "");
-  // strip leading slash — window.location.hash expects a path WITHOUT leading /
-  window.location.hash = clean.startsWith("/") ? clean : `/${clean}`;
+  let clean = target.replace(/^#/, "");
+  // Legacy link normalization: if the link is a short form like "/wallet"
+  // (without "/dashboard" prefix), prepend "/dashboard" so the SPA router
+  // lands on the right view instead of falling back to the landing page.
+  if (!clean.startsWith("/dashboard/") && !clean.startsWith("dashboard/")) {
+    if (clean.startsWith("/")) clean = `/dashboard${clean}`;
+    else clean = `/dashboard/${clean}`;
+  }
+  // window.location.hash expects a path WITHOUT leading /
+  const withSlash = clean.startsWith("/") ? clean : `/${clean}`;
+  window.location.hash = withSlash;
 }
 
 export function NotificationBell({ className }: { className?: string }) {
@@ -103,7 +135,7 @@ export function NotificationBell({ className }: { className?: string }) {
     // Optimistically mark read in the local list too.
     setItems((cur) => cur.map((it) => (it.id === n.id ? { ...it, readAt: it.readAt ?? new Date().toISOString() } : it)));
     setOpen(false);
-    navToAction(n.link);
+    navToAction(n.link, n.category);
   }
 
   if (!user) return null;

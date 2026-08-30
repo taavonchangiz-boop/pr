@@ -358,7 +358,7 @@ export async function bankVerifyAndFinalize(input: {
         category: "payment",
         titleFa: "پرداخت موفق",
         bodyFa: `پرداخت ${formatRials(input.order.amountRials)} با کد پیگیری ${traceNo ?? input.authority.slice(0, 8)} تأیید شد.`,
-        link: "/wallet",
+        link: "/dashboard/wallet",
       },
     });
     await audit({

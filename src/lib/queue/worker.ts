@@ -217,7 +217,7 @@ async function processJob(
           category: "publish",
           titleFa: "ارسال موفق",
           bodyFa: `پیام «${content.title}» با موفقیت ارسال شد.`,
-          link: null,
+          link: "/dashboard/content",
           readAt: null,
         },
       });

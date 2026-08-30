@@ -182,7 +182,7 @@ export async function adminApproveCardOrder(input: {
         (order.kind === "subscription" && result.subscriptionId
           ? " اشتراک شما فعال شد."
           : ""),
-      link: "/wallet",
+      link: "/dashboard/orders",
     },
   });
 
@@ -247,6 +247,7 @@ export async function adminRejectCardOrder(input: {
       bodyFa:
         `رسید پرداخت شما برای سفارش رد شد.` +
         (input.notes ? ` دلیل: ${input.notes}` : ""),
+      link: "/dashboard/orders",
     },
   });
   await audit({

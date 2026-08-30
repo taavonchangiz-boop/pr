@@ -131,7 +131,7 @@ async function evalOneBot(bot: {
     category: "gold",
     titleFa,
     bodyFa,
-    link: null,
+    link: "/dashboard/gold",
   });
 
   // Optionally publish to destination if configured.

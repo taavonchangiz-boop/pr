@@ -495,7 +495,7 @@ export async function processBaleUpdate(bot: Bot, update: BaleUpdate): Promise<{
         category: "payment",
         titleFa: "پرداخت موفق",
         bodyFa: `پرداخت ${formatRials(order.amountRials)} از طریق کیف پول بله با کد پیگیری ${toPersianDigits(chargeId.slice(-12))} تأیید شد.`,
-        link: "/wallet",
+        link: "/dashboard/wallet",
       },
     });
     await audit({

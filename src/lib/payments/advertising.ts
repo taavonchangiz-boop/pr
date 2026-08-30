@@ -357,6 +357,7 @@ export async function adminApproveAd(input: {
       category: "ad",
       titleFa: "تأیید تبلیغ",
       bodyFa: `تبلیغ «${ad.title}» شما تأیید شد و در حال نمایش است.`,
+      link: "/dashboard/advertising",
     },
   });
   return toAdView(updated);
@@ -394,6 +395,7 @@ export async function adminRejectAd(input: {
       category: "ad",
       titleFa: "رد تبلیغ",
       bodyFa: `تبلیغ «${ad.title}» شما رد شد.` + (input.reason ? ` دلیل: ${input.reason}` : ""),
+      link: "/dashboard/advertising",
     },
   });
   return toAdView(updated);

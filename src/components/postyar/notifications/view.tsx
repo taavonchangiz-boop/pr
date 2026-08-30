@@ -89,17 +89,37 @@ export function NotificationsView({ navigate }: NotificationsViewProps) {
 
   function onClick(n: NotificationView) {
     onMarkOne(n);
-    if (n.link) {
-      // External or hash-route link
-      if (n.link.startsWith("#")) {
-        navigate(n.link.slice(1));
-      } else if (n.link.startsWith("/")) {
-        navigate(n.link);
-      } else {
-        // Hash-route form like /dashboard/foo
-        navigate(n.link);
-      }
+    // Normalize the link: legacy DB rows may carry short links like
+    // "/wallet" (without "/dashboard" prefix) which the SPA router would
+    // treat as unknown → landing page. Rewrite them to "/dashboard/...".
+    // When the link is empty, fall back to the category's main view.
+    const target = (n.link ?? "").trim();
+    const CATEGORY_FALLBACK: Record<string, string> = {
+      publish: "/dashboard/content",
+      payment: "/dashboard/wallet",
+      subscription: "/dashboard/subscriptions",
+      referral: "/dashboard/referral",
+      ad: "/dashboard/advertising",
+      ticket: "/dashboard/tickets",
+      gold: "/dashboard/gold",
+      woo: "/dashboard/woo",
+      security: "/dashboard/profile",
+      system: "/dashboard/notifications",
+    };
+    let dest = "";
+    if (!target) {
+      dest = CATEGORY_FALLBACK[n.category] ?? "/dashboard/notifications";
+    } else if (target.startsWith("/dashboard/") || target.startsWith("dashboard/")) {
+      dest = target.startsWith("/") ? target : `/${target}`;
+    } else if (target.startsWith("#")) {
+      const stripped = target.slice(1);
+      dest = stripped.startsWith("/") ? stripped : `/${stripped}`;
+    } else if (target.startsWith("/")) {
+      dest = `/dashboard${target}`;
+    } else {
+      dest = `/dashboard/${target}`;
     }
+    navigate(dest);
   }
 
   return (

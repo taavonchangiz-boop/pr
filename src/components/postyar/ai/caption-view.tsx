@@ -42,17 +42,25 @@ export interface AiCaptionViewProps {
   navigate: (to: string) => void;
 }
 
-type ToneKey = "formal" | "friendly" | "casual" | "technical";
+// NOTE: enum values MUST match the backend Zod schema in
+// /api/ai/generate-caption/route.ts:
+//   tone:     formal | friendly | casual | promotional | educational
+//   purpose:  engagement | sale | awareness | announcement
+//   platform: telegram | bale | rubika | instagram | website | general
+//   length:   short | medium | long
+// `audience` is a free-form string so any value is accepted.
+type ToneKey = "formal" | "friendly" | "casual" | "promotional" | "educational";
 type AudienceKey = "general" | "technical" | "childish" | "managers";
 type LengthKey = "short" | "medium" | "long";
-type PlatformKey = "telegram" | "bale" | "rubika" | "instagram";
-type PurposeKey = "marketing" | "education" | "entertainment" | "news";
+type PlatformKey = "telegram" | "bale" | "rubika" | "instagram" | "website" | "general";
+type PurposeKey = "engagement" | "sale" | "awareness" | "announcement";
 
 const TONES: Array<{ key: ToneKey; label: string }> = [
   { key: "formal", label: "رسمی" },
   { key: "friendly", label: "دوستانه" },
   { key: "casual", label: "صمیمی" },
-  { key: "technical", label: "فنی" },
+  { key: "promotional", label: "تبلیغاتی" },
+  { key: "educational", label: "آموزشی" },
 ];
 
 const AUDIENCES: Array<{ key: AudienceKey; label: string }> = [
@@ -73,13 +81,15 @@ const PLATFORMS: Array<{ key: PlatformKey; label: string }> = [
   { key: "bale", label: "بله" },
   { key: "rubika", label: "روبیکا" },
   { key: "instagram", label: "اینستاگرام" },
+  { key: "website", label: "وب‌سایت" },
+  { key: "general", label: "عمومی" },
 ];
 
 const PURPOSES: Array<{ key: PurposeKey; label: string }> = [
-  { key: "marketing", label: "تبلیغ" },
-  { key: "education", label: "آموزش" },
-  { key: "entertainment", label: "سرگرمی" },
-  { key: "news", label: "خبر" },
+  { key: "engagement", label: "تعامل و مشارکت" },
+  { key: "sale", label: "فروش" },
+  { key: "awareness", label: "معرفی برند" },
+  { key: "announcement", label: "اطلاع‌رسانی" },
 ];
 
 export function AiCaptionView({ navigate }: AiCaptionViewProps) {
@@ -88,7 +98,7 @@ export function AiCaptionView({ navigate }: AiCaptionViewProps) {
   const [audience, setAudience] = useState<AudienceKey>("general");
   const [length, setLength] = useState<LengthKey>("short");
   const [platform, setPlatform] = useState<PlatformKey>("telegram");
-  const [purpose, setPurpose] = useState<PurposeKey>("marketing");
+  const [purpose, setPurpose] = useState<PurposeKey>("engagement");
 
   const [result, setResult] = useState<AiCaptionResult | null>(null);
   const [editable, setEditable] = useState("");

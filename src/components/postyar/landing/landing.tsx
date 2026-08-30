@@ -45,29 +45,27 @@ const FEATURES: { icon: any; title: string; body: string; tint: string }[] = [
   { icon: CalendarClockIcon, title: "زمان‌بندی جلالی", body: "تقویم حرفه‌ای فارسی برای انتشار دقیق در هر ساعت.", tint: "#34d399" },
   { icon: SparklesIcon, title: "هوش مصنوعی", body: "تولید کپشن، متن هوشمند و پاسخ خودکار با پشتیبانی چند ارائه‌دهنده.", tint: "#A855F7" },
   { icon: BotIcon, title: "بات‌ساز بدون کدنویسی", body: "ساخت بات تلگرام، بله و روبیکا با گردش کار واقعی.", tint: "#38bdf8" },
-  { icon: WalletIcon, title: "کیف پول و دفتر کل", body: "مدیریت مالیه با ثبت دقیق هر تراکنش و جلوگیری از دو-بار‌گذاری.", tint: "#f59e0b" },
+  { icon: WalletIcon, title: "کیف پول و دفتر کل", body: "مدیریت مالی با ثبت دقیق هر تراکنش و امکان شفاف مشاهدهٔ موجودی.", tint: "#f59e0b" },
   { icon: GiftIcon, title: "معرفی دوستان", body: "سامانه ارجاع با کد اختصاصی و پاداش خودکار.", tint: "#34d399" },
   { icon: TrendingUpIcon, title: "پایش طلا", body: "قیمت لحظه‌ای طلای ۱۸، سکه امامی و انس جهانی + بات هشدار.", tint: "#22d3ee" },
   { icon: ShoppingCartIcon, title: "اتصال ووکامرس", body: "همگام‌سازی محصولات و انتشار خودکار روی کانال‌ها.", tint: "#38bdf8" },
   { icon: MegaphoneIcon, title: "تبلیغات هدفمند", body: "ثبت کمپین، بازبینی مدیر و گزارش کلیک و نمایش.", tint: "#A855F7" },
   { icon: BellIcon, title: "اعلان‌های هوشمند", body: "اعلان درون‌برنامه‌ای، ایمیلی و پیامکی با تنظیمات کاربر.", tint: "#f59e0b" },
   { icon: TicketIcon, title: "تیکت و پشتیبانی", body: "سامانه تیکت با اولویت‌بندی و پاسخگوی پشتیبان.", tint: "#34d399" },
-  { icon: ShieldCheckIcon, title: "امنیت تولید", body: "احراز هویت دو مرحله‌ای، OTP رمزنگاری‌شده، Webhook با HMAC.", tint: "#22d3ee" },
 ];
 
 const TRUST: { icon: any; title: string; body: string }[] = [
-  { icon: KeyRoundIcon, title: "احراز هویت چندعاملی", body: "ایمیل و رمز عبور یا موبایل و کد یکبار مصرف رمزنگاری‌شده." },
-  { icon: LockIcon, title: "رمزنگاری در حال استراحت", body: "توکن‌ها و کلیدها با AES-256-GCM رمزنگاری می‌شوند." },
-  { icon: ZapIcon, title: "پاسخ‌گوی خودکار", body: "پاسخ هوشمند به پیام‌های دریافتی با حفاظ از حلقه و سهمیه." },
-  { icon: LanguagesIcon, title: "فارسی‌محور، راست‌چین", body: "تقویم جلالی، ارقام فارسی و فونت وزیرمتن به‌صورت بومی." },
+  { icon: KeyRoundIcon, title: "ورود امن", body: "با ایمیل و رمز عبور یا شماره موبایل و کد یکبار مصرف وارد می‌شوید؛ اطلاعات حساب شما محفوظ می‌ماند." },
+  { icon: LockIcon, title: "حفاظت از اطلاعات", body: "اطلاعات حساس شما مثل توکن بات‌ها به‌صورت امن نگهداری می‌شود و در اختیار دیگران قرار نمی‌گیرد." },
+  { icon: ZapIcon, title: "پاسخ‌گوی خودکار", body: "پاسخ هوشمند به پیام‌های دریافتی کاربرانتان را سریع و بدون وقفه مدیریت کنید." },
+  { icon: LanguagesIcon, title: "فارسی‌محور، راست‌چین", body: "تقویم جلالی، ارقام فارسی و فونت وزیرمتن به‌صورت بومی و کاملاً راست‌چین." },
 ];
 
 const FAQ: { q: string; a: string }[] = [
-  { q: "آیا پُست‌یار فقط برای تلگرام است؟", a: "خیر؛ سه پلتفرم تلگرام، بله و روبیکا به‌صورت هم‌زمان پشتیبانی می‌شوند و هر کدام دکمه‌های شیشه‌ای مختص خود را دارند." },
-  { q: "آیا پرداخت با بله واقعی است؟", a: "بله؛ پُست‌یار از پروتکل واقعی بات بله (sendInvoice → pre_checkout_query → successful_payment) با تأیید سمت-سرور مبلغ و امضای HMAC استفاده می‌کند." },
-  { q: "آیا داده‌های مالی من امن هستند؟", a: "هر تراکنش مالیه با کلید یکتا idempotency ثبت می‌شود تا تحت هیچ شرایطی دو بار اعتبار نگیرد. مبالغ به‌صورت اعداد صحیح ریال نگهداری می‌شوند." },
-  { q: "آیا برای استفاده نیاز به دانش فنی است؟", a: "خیر؛ رابط کاربری کاملاً فارسی و راست‌چین است. بات‌ساز بدون کدنویسی، تنظیم‌گراف گردش کار و تقویم جلالی مخصوص فارسی‌زبان‌ها طراحی شده است." },
-  { q: "آیا روی هاست cPanel قابل نصب است؟", a: "بله؛ پُست‌یار برای محیط cPanel/Passenger + Node.js + MariaDB + Redis طراحی و بهینه شده است." },
+  { q: "آیا پُست‌یار فقط برای تلگرام است؟", a: "خیر؛ شما می‌توانید هم‌زمان روی تلگرام، بله و روبیکا محتوا منتشر کنید و برای هر پلتفرم دکمه‌های اختصاصی بسازید." },
+  { q: "آیا پرداخت با بله واقعی است؟", a: "بله؛ پرداخت از داخل خود بات بله انجام می‌شود و مبلغ پرداختی به‌صورت امن و دقیق در حساب شما ثبت می‌گردد. خیال شما از بابت صحت پرداخت راحت باشد." },
+  { q: "آیا اطلاعات مالی من امن است؟", a: "بله؛ تمام پرداخت‌ها و تراکنش‌ها به‌صورت دقیق و شفاف ثبت می‌شوند و موجودی کیف پول شما همیشه در دسترس شماست. هیچ پرداختی دو بار محاسبه نمی‌شود." },
+  { q: "آیا برای استفاده نیاز به دانش فنی است؟", a: "خیر؛ رابط کاربری کاملاً فارسی و راست‌چین است. همهٔ کارها از ساخت بات تا انتشار محتوا و زمان‌بندی، بدون نیاز به کدنویسی و فقط با چند کلیک انجام می‌شود." },
 ];
 
 const VALUE_PROPS: { icon: any; title: string; body: string }[] = [
@@ -76,17 +74,25 @@ const VALUE_PROPS: { icon: any; title: string; body: string }[] = [
   { icon: SparklesIcon, title: "هوش مصنوعی در دل کار", body: "کپشن هوشمند، متن هوشمند و پاسخ هوشمند در همان ویرایشگر محتوا در دسترس شماست." },
 ];
 
-// Hero visual — supported platforms as glassmorphic mini-cards (lucide generic
-// icons tinted with each platform's official brand color; lucide has no brand
-// icons so this is the closest equivalent).
-const PLATFORMS: { icon: any; label: string; color: string }[] = [
-  { icon: SendIcon,          label: "تلگرام",       color: "#22d3ee" },
-  { icon: MessageCircleIcon, label: "بله",          color: "#3b82f6" },
-  { icon: RadioIcon,         label: "روبیکا",       color: "#8b5cf6" },
-  { icon: BotIcon,           label: "بات",          color: "#34d399" },
-  { icon: SparklesIcon,      label: "هوش مصنوعی",  color: "#34d399" },
-  { icon: GlobeIcon,         label: "وردپرس",       color: "#21759b" },
-  { icon: ShoppingCartIcon,  label: "ووکامرس",      color: "#7f54b3" },
+// Hero visual — supported platforms. For بله and روبیکا we use the OFFICIAL
+// brand SVG/PNG assets supplied by the user (/brand/bale-logo.svg,
+// /brand/rubika-logo.png). For the rest we fall back to lucide icons tinted
+// with the brand's color. Each platform renders either an <img> (official) or
+// a <Icon> (lucide), decided by the `src` field being present.
+type PlatformEntry = {
+  label: string;
+  color: string;
+  src?: string;        // official brand asset path
+  icon?: any;           // lucide fallback icon
+};
+const PLATFORMS: PlatformEntry[] = [
+  { label: "تلگرام",      color: "#229ED9", icon: SendIcon },
+  { label: "بله",         color: "#3b82f6", src: "/brand/bale-logo.svg" },
+  { label: "روبیکا",      color: "#8b5cf6", src: "/brand/rubika-logo.png" },
+  { label: "بات",         color: "#34d399", icon: BotIcon },
+  { label: "هوش مصنوعی", color: "#34d399", icon: SparklesIcon },
+  { label: "وردپرس",      color: "#21759b", icon: GlobeIcon },
+  { label: "ووکامرس",     color: "#7f54b3", icon: ShoppingCartIcon },
 ];
 
 const FONT_STACK = { fontFamily: "Vazirmatn, ui-sans-serif, system-ui, sans-serif" } as const;
@@ -237,7 +243,7 @@ export function Landing({ navigate }: LandingProps) {
               </Button>
             </div>
             <ul className="mt-6 flex flex-wrap justify-center gap-x-5 gap-y-2 text-xs text-[#94a3b8] lg:justify-start">
-              {["بدون نیاز به دانش فنی", "تلگرام، بله و روبیکا", "تقویم جلالی و ارقام فارسی", "نصب‌پذیر روی cPanel"].map((t) => (
+              {["بدون نیاز به دانش فنی", "تلگرام، بله و روبیکا", "تقویم جلالی و ارقام فارسی", "پشتیبانی فارسی و زنده"].map((t) => (
                 <li key={t} className="inline-flex items-center gap-1">
                   <CheckCircle2Icon className="size-3.5 text-[#34d399]" />
                   {t}
@@ -266,7 +272,7 @@ export function Landing({ navigate }: LandingProps) {
                   className="mx-auto rounded-md bg-white/5 px-3 py-0.5 text-[10px] leading-4 text-[#94a3b8]"
                   dir="ltr"
                 >
-                  postyar.ir/dashboard
+                  postyarhub.ir
                 </div>
               </div>
               <img
@@ -356,7 +362,17 @@ export function Landing({ navigate }: LandingProps) {
                     className="flex flex-col items-center gap-1 rounded-xl border border-white/10 bg-white/5 p-2.5 backdrop-blur motion-safe:transition-colors hover:border-[#22d3ee]/40"
                     title={p.label}
                   >
-                    <Icon className="size-4" style={{ color: p.color }} />
+                    {p.src ? (
+                      <img
+                        src={p.src}
+                        alt={p.label}
+                        className="size-4 object-contain"
+                        loading="lazy"
+                        decoding="async"
+                      />
+                    ) : (
+                      <Icon className="size-4" style={{ color: p.color }} />
+                    )}
                     <span className="text-[10px] text-[#94a3b8]">{p.label}</span>
                   </div>
                 );
@@ -447,7 +463,7 @@ export function Landing({ navigate }: LandingProps) {
             <img
               src="/brand/asovin.webp"
               alt="نمای برند پُست‌یار"
-              className="block w-full rounded-2xl border border-white/10 shadow-2xl shadow-[#070b16] object-cover aspect-[16/10] sm:aspect-[16/9] lg:aspect-[2/1]"
+              className="block w-full rounded-2xl border border-white/10 shadow-2xl shadow-[#070b16] object-contain bg-[#0d1322] aspect-[3/4] sm:aspect-[4/3] lg:aspect-[3/4]"
               loading="lazy"
               decoding="async"
             />
@@ -497,15 +513,15 @@ export function Landing({ navigate }: LandingProps) {
             </Badge>
             <h2 className="mt-4 text-2xl font-bold text-white md:text-3xl">بات خود را بسازید و گردش کار واقعی تعریف کنید</h2>
             <p className="mt-3 text-sm leading-7 text-[#94a3b8]">
-              بات تلگرام، بله یا روبیکا را با چند کلیک بسازید؛ توکن شما رمزنگاری می‌شود،
-              وب‌هوک با امضای HMAC تأیید می‌شود و گردش کار قابلیت‌های واقعی پرداخت،
-              کیف پول، طلا و پشتیبانی را به‌هم متصل می‌کند.
+              بات تلگرام، بله یا روبیکا را با چند کلیک بسازید؛ توکن بات شما به‌صورت امن
+              نگهداری می‌شود و گردش کار قابلیت‌های واقعی پرداخت، کیف پول، طلا و
+              پشتیبانی را به‌هم متصل می‌کند.
             </p>
             <ul className="mt-5 space-y-2 text-sm text-[#dbe7ff]/85">
-              <li className="flex items-start gap-2"><CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" /> اتصال کاربران به حساب پُست‌یار با کد یکبار مصرف امضا‌دار</li>
-              <li className="flex items-start gap-2"><CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" /> ارسال فاکتور بله با تأیید سمت-سرور مبلغ</li>
+              <li className="flex items-start gap-2"><CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" /> اتصال کاربران به حساب پُست‌یار با کد یکبار مصرف امن</li>
+              <li className="flex items-start gap-2"><CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" /> ارسال فاکتور و دریافت پرداخت از داخل بات بله</li>
               <li className="flex items-start gap-2"><CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" /> تاریخچهٔ کامل پیام‌ها برای تحلیل و پشتیبانی</li>
-              <li className="flex items-start gap-2"><CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" /> پرسش و پاسخ هوشمند با حفاظ از حلقه و سهمیه</li>
+              <li className="flex items-start gap-2"><CheckCircle2Icon className="mt-0.5 size-4 shrink-0 text-[#34d399]" /> پاسخ خودکار به پرسش‌های پرتکرار کاربران</li>
             </ul>
             <div className="mt-6">
               <Button
@@ -638,7 +654,7 @@ export function Landing({ navigate }: LandingProps) {
         <div className="mx-auto max-w-6xl px-4">
           <div className="mb-8 text-center">
             <h2 className="text-2xl font-bold text-white md:text-3xl">امنیت و اعتماد</h2>
-            <p className="mt-2 text-sm text-[#94a3b8]">پُست‌یار از رویکرد fail-closed استفاده می‌کند.</p>
+            <p className="mt-2 text-sm text-[#94a3b8]">راحت باشید؛ اطلاعات شما نزد ما محفوظ است.</p>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             {TRUST.map((t, i) => {
@@ -695,7 +711,7 @@ export function Landing({ navigate }: LandingProps) {
           <div className="rounded-3xl border border-[#f59e0b]/30 bg-[#0f172a]/60 p-8 text-center backdrop-blur md:p-12">
             <h2 className="text-2xl font-black text-white md:text-3xl">همین حالا شروع کنید</h2>
             <p className="mx-auto mt-3 max-w-xl text-sm leading-7 text-[#dbe7ff]/85">
-              ثبت‌نام در کمتر از یک دقیقه؛ بدون نیاز به کارت اعتباری. اولین کاربر به‌طور خودکار مدیر سامانه می‌شود.
+              ثبت‌نام در کمتر از یک دقیقه؛ بدون نیاز به کارت اعتباری. همین حالا شروع کنید و از همهٔ امکانات بهره‌مند شوید.
             </p>
             <Button
               size="lg"

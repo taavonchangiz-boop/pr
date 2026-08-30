@@ -3793,3 +3793,26 @@ Stage Summary:
 - Items 1, 12 (image sizing in landing + training); 2 (dashboard revamp with skill); 3, 15 (RTL global + accordion auto-close); 4, 5 (no-plan checkout + direct wallet charge); 6 (auto free plan on signup); 7 (AdCampaign FK fix); 8, 9, 19a (ad placement sizes + preview + slider); 10 (tickets complete with department + priority); 11 (notification action link); 13 (training 48 cards); 14 (content preview before publish); 16 (broadcast empty-state CTA); 17 (super-admin lock); 18 (plan POST schema fix + plain Persian labels); 19b (gateway dropdown with direct/intermediate); 20 (per-section Save + Save-All); 21 (SMS panel dropdown with per-panel settings).
 - Commit 0e8461a pushed to pr.git. Dev server running on port 3000 (PID stable).
 - Recommended: rotate the PAT (it was exposed in chat).
+
+---
+Task ID: final-batch
+Agent: Z.ai Code (main)
+Task: Address user's 13-item feedback batch (icons, URLs, RTL, sidebar sticky, AI, images, training, notifications, technical text removal)
+
+Work Log:
+- Copied official brand icons to /public/brand/: bale-logo.svg (from upload/Logo07.svg), rubika-logo.png (from upload/minimal.png), plus bale-logo.png for PNG fallback.
+- landing.tsx: rewrote PLATFORMS to use official <img> for بله/روبیکا (lucide fallback for others); changed hero URL "postyar.ir/dashboard" → "postyarhub.ir"; replaced "نصب‌پذیر روی cPanel" hero bullet with "پشتیبانی فارسی و زنده"; changed asovin.webp from object-cover (cropped) to object-contain with bg + portrait aspect so the FULL image shows; removed "امنیت تولید" feature card (2FA/OTP/HMAC); rewrote TRUST cards to plain Persian (no AES-256-GCM, no HMAC); rewrote FAQ — removed cPanel question entirely, rewrote all answers in plain non-technical reassuring Persian; rewrote bot-builder section (no HMAC/Webhook jargon); rewrote CTA (removed "اولین کاربر...مدیر سامانه" security leak); fixed "مالیه" → "مالی" in FEATURES.
+- training.tsx: removed "شروع کار و ثبت‌نام" step entirely (security — it documented how the first registered user becomes admin); renamed group "start" → "account" (and GROUP_LABELS); removed standalone <header> and <footer> (Training is rendered inside the dashboard shell which already provides both); changed root wrapper from min-h-screen flex to w-full; changed asovin image from object-cover (cropped) to object-contain with bg; changed intro text from "از ثبت‌نام تا تنظیمات" to "از مدیریت حساب و محتوا تا بات‌سازی و تنظیمات"; changed bottom CTA from "آمادهٔ شروع هستید? / بازگشت به خانه" to "سؤال دیگری دارید? / رفتن به تیکت‌ها" (navigate to /dashboard/tickets); cleaned up unused Logo & ArrowRightIcon imports.
+- dashboard.tsx: changed sidebar from `fixed lg:static` (scrolls with page — the bug) to `fixed lg:fixed` with `lg:top-16 lg:bottom-0 lg:overflow-y-auto` so the desktop sidebar stays pinned below the header and never moves on scroll; added `lg:pr-64` to <main> so desktop content clears the fixed 16rem sidebar.
+- ai/caption-view.tsx: fixed enum mismatch causing POST /api/ai/generate-caption to return 400. Frontend ToneKey/PurposeKey/PlatformKey now match backend Zod schema exactly: tone ∈ {formal,friendly,casual,promotional,educational}, purpose ∈ {engagement,sale,awareness,announcement}, platform ∈ {telegram,bale,rubika,instagram,website,general}. Updated TONES/PLATFORMS/PURPOSES arrays + default purpose from "marketing" (invalid) to "engagement".
+- Notification link normalization (root cause of "clicking some notifications redirects to landing"): all notification senders were setting link: null OR legacy short links like "/wallet". The SPA router parses "/wallet" as unknown route → landing fallback. Fixed BOTH: (a) updated all 9 sender sites to use proper "/dashboard/<view>" links — tickets/index.ts (4×), gold/bot.ts, bale.ts, bank.ts, wallet.ts (2×), referral.ts, card.ts (2×), advertising.ts (2×), queue/worker.ts; (b) added defensive link normalization in notification-bell.tsx navToAction() and notifications/view.tsx onClick() — legacy "/wallet" → "/dashboard/wallet", and null link → category fallback view (e.g., ticket → /dashboard/tickets).
+
+Stage Summary:
+- All 13 user items addressed. Verified end-to-end with Agent Browser:
+  - Landing renders cleanly, postyarhub.ir shows in hero, official بله/روبیکا icons render as <img>, no cPanel/AES/HMAC/idempotency/sendInvoice terms remain in snapshot.
+  - AI caption generation: POST /api/ai/generate-caption now returns 200 (was 400) and "کپشن پیشنهادی" + "درج در محتوا" buttons appear.
+  - Dashboard sidebar: position=fixed, top stays at 64px through scroll (verified via getBoundingClientRect before/after scroll).
+  - Training page: rendered inside dashboard shell, no own header/footer; first step is "خانه داشبورد" (registration step removed); intro says "از مدیریت حساب..." (no registration mention).
+  - Notifications: clicking payment notification (legacy link "/wallet") → navigates to /dashboard/wallet (not landing); clicking ticket notification (null link) → navigates to /dashboard/tickets.
+- bun run lint: clean (no errors). dev.log: all 200s, no errors.
+- Ready for commit & push to remote `pr`.

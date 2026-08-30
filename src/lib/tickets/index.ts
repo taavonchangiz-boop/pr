@@ -225,7 +225,7 @@ export async function replyTicket(input: {
       category: "ticket",
       titleFa: `پاسخ تیکت: ${ticket.subject}`,
       bodyFa: `یک پاسخ جدید روی تیکت «${ticket.subject}» ثبت شد.`,
-      link: null,
+      link: "/dashboard/tickets",
       email: ticket.user?.email ? { to: ticket.user.email } : null,
     });
   }
@@ -308,7 +308,7 @@ export async function assignTicket(input: {
     category: "ticket",
     titleFa: "تیکت جدید به شما اختصاص یافت",
     bodyFa: `تیکت «${ticket.subject}» به شما اختصاص یافت.`,
-    link: null,
+    link: "/dashboard/tickets",
   });
   return { ok: true };
 }
@@ -656,7 +656,7 @@ export async function assignTicketFields(input: {
       category: "ticket",
       titleFa: "تیکت جدید به شما اختصاص یافت",
       bodyFa: `تیکت «${ticket.subject}» به شما اختصاص یافت.`,
-      link: null,
+      link: "/dashboard/tickets",
     });
   }
 
@@ -876,7 +876,7 @@ export async function replyTicketWithAttachments(input: {
       category: "ticket",
       titleFa: `پاسخ تیکت: ${ticket.subject}`,
       bodyFa: `یک پاسخ جدید روی تیکت «${ticket.subject}» ثبت شد.`,
-      link: null,
+      link: "/dashboard/tickets",
       email: ticket.user?.email ? { to: ticket.user.email } : null,
     });
   }

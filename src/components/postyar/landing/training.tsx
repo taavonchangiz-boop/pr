@@ -13,11 +13,10 @@ import {
   InboxIcon, TrendingUpIcon, BellRingIcon, BotIcon, WorkflowIcon, LinkIcon,
   RadioIcon, LineChartIcon, UsersIcon, ShieldCheckIcon, ActivityIcon,
   ClipboardCheckIcon, PercentIcon, BanknoteIcon, ClipboardListIcon,
-  CalendarCheckIcon, CoinsIcon, StoreIcon, SettingsIcon, ArrowRightIcon,
+  CalendarCheckIcon, CoinsIcon, StoreIcon, SettingsIcon,
   ArrowLeftIcon,
 } from "lucide-react";
 import { toPersianDigits } from "@/lib/persian";
-import { Logo } from "@/components/layout/logo";
 
 export interface TrainingProps {
   navigate: (to: string) => void;
@@ -25,7 +24,7 @@ export interface TrainingProps {
 
 const FONT_STACK = { fontFamily: "Vazirmatn, ui-sans-serif, system-ui, sans-serif" } as const;
 
-type TrainingGroupId = "start" | "content" | "ai" | "gold" | "bots" | "admin";
+type TrainingGroupId = "account" | "content" | "ai" | "gold" | "bots" | "admin";
 
 interface TrainingStep {
   icon: ComponentType<{ className?: string }>;
@@ -36,7 +35,7 @@ interface TrainingStep {
 }
 
 const GROUP_LABELS: Record<TrainingGroupId, string> = {
-  start: "شروع و حساب کاربری",
+  account: "حساب کاربری",
   content: "محتوا",
   ai: "هوش مصنوعی",
   gold: "طلا",
@@ -45,23 +44,14 @@ const GROUP_LABELS: Record<TrainingGroupId, string> = {
 };
 
 const STEPS: TrainingStep[] = [
-  // ===== Group 1 — شروع و حساب کاربری =====
-  {
-    icon: RocketIcon,
-    group: "start",
-    title: "شروع کار و ثبت‌نام",
-    intro: "از صفحهٔ اصلی پُست‌یار ثبت‌نام کنید و وارد شوید؛ نخستین کاربری که ثبت‌نام می‌کند به‌طور خودکار مدیر سامانه می‌شود.",
-    points: [
-      "روی دکمهٔ «ثبت‌نام» در گوشهٔ صفحهٔ اصلی بزنید.",
-      "نام، نام خانوادگی، ایمیل، موبایل، رمز عبور و نوع فعالیت را وارد کنید.",
-      "اگر کد معرف دارید آن را وارد کنید تا پاداش ارجاع برایتان ثبت شود.",
-      "روی «ساخت حساب» بزنید و وارد داشبورد شوید؛ از همان لحظه نقش مدیر برای نخستین کاربر فعال می‌شود.",
-      "کاربران بعدی به‌صورت کاربر عادی ثبت‌نام می‌کنند و نقش مدیر تنها ازطریق مدیران فعلی قابل انتساب است.",
-    ],
-  },
+  // ===== Group 1 — حساب کاربری =====
+  // NOTE: The "شروع کار و ثبت‌نام" step was intentionally REMOVED for security —
+  // publicly documenting how the first-registered user becomes the system
+  // admin would hand attackers a roadmap. Users reach this training page
+  // only AFTER they are already signed in, so registration help is moot.
   {
     icon: HomeIcon,
-    group: "start",
+    group: "account",
     title: "خانه داشبورد",
     intro: "نمای کلی حساب شما؛ خوش‌آمد، شاخص‌های کلیدی، دسترسی‌های سریع و آخرین اعلان‌ها را یک‌جا ببینید.",
     points: [
@@ -74,7 +64,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: BarChart3Icon,
-    group: "start",
+    group: "account",
     title: "آمار شخصی",
     intro: "آمار فعالیت خود را در سه نمای «آمار»، «اینفوگرافیک» و «لیست» ببینید.",
     points: [
@@ -87,7 +77,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: PackageIcon,
-    group: "start",
+    group: "account",
     title: "اشتراک",
     intro: "اشتراک فعال خود را ببینید، روزهای باقی‌مانده را پیگیری و در صورت نیاز تمدید کنید.",
     points: [
@@ -100,7 +90,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: SparklesIcon,
-    group: "start",
+    group: "account",
     title: "پلن‌ها",
     intro: "پلن‌های سامانه را مرور کنید، امکانات هرکدام را ببینید و پلن دلخواه را انتخاب کنید.",
     points: [
@@ -113,7 +103,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: CreditCardIcon,
-    group: "start",
+    group: "account",
     title: "تسویه‌حساب بدون پلن",
     intro: "کیف پول خود را مستقیم شارژ کنید؛ بدون نیاز به انتخاب پلن، مبلغ را وارد و پرداخت کنید.",
     points: [
@@ -126,7 +116,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: ListOrderedIcon,
-    group: "start",
+    group: "account",
     title: "سفارش‌ها",
     intro: "همهٔ سفارش‌های شما در یک فهرست، با وضعیت و وضعیت پرداخت هرکدام.",
     points: [
@@ -139,7 +129,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: WalletIcon,
-    group: "start",
+    group: "account",
     title: "کیف پول",
     intro: "موجودی فعلی، شارژ کیف پول و تاریخچهٔ تراکنش‌ها را اینجا ببینید.",
     points: [
@@ -152,7 +142,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: BookOpenIcon,
-    group: "start",
+    group: "account",
     title: "دفتر کل",
     intro: "تمام تراکنش‌های مالی شما (واریز، برداشت، پاداش ارجاع و...) در یک فهرست کامل.",
     points: [
@@ -165,7 +155,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: GiftIcon,
-    group: "start",
+    group: "account",
     title: "معرفی دوستان",
     intro: "کد معرف خود را کپی کنید، با دوستان به‌اشتراک بگذارید و پاداش ارجاع بگیرید.",
     points: [
@@ -178,7 +168,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: MegaphoneIcon,
-    group: "start",
+    group: "account",
     title: "تبلیغات",
     intro: "کمپین تبلیغاتی بسازید، جایگاه نمایش را انتخاب و پیش از ارسال پیش‌نمایش ببینید.",
     points: [
@@ -191,7 +181,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: TicketIcon,
-    group: "start",
+    group: "account",
     title: "تیکت‌ها",
     intro: "برای پشتیبانی تیکت باز کنید، دپارتمان و اولویت را انتخاب و فایل پیوست کنید.",
     points: [
@@ -204,7 +194,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: BellIcon,
-    group: "start",
+    group: "account",
     title: "اعلان‌ها",
     intro: "اعلان‌های سامانه را بخوانید، همگی را «خوانده‌شده» علامت بزنید و با کلیک به اکشن بروید.",
     points: [
@@ -217,7 +207,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: UserIcon,
-    group: "start",
+    group: "account",
     title: "پروفایل",
     intro: "اطلاعات شخصی را ویرایش کنید، رمز عبور را تغییر و تنظیمات اعلان را تنظیم کنید.",
     points: [
@@ -230,7 +220,7 @@ const STEPS: TrainingStep[] = [
   },
   {
     icon: GraduationCapIcon,
-    group: "start",
+    group: "account",
     title: "آموزش (همین صفحه)",
     intro: "این صفحه را گام‌به‌گام دنبال کنید؛ همهٔ بخش‌های داشبورد در ۶ گروه آموزش داده شده‌اند.",
     points: [
@@ -684,32 +674,13 @@ const STEPS: TrainingStep[] = [
 ];
 
 export function Training({ navigate }: TrainingProps) {
+  // NOTE: This component is rendered INSIDE the authenticated dashboard shell,
+  // which already provides its own header (logo, bell, clock, back-to-home)
+  // and footer. We therefore render ONLY the training content here — no
+  // duplicate header, no duplicate footer, no full-screen wrapper.
   return (
-    <div dir="rtl" className="min-h-screen flex flex-col bg-[#070b16] text-[#e2e8ff]" style={FONT_STACK}>
-      {/* sticky header */}
-      <header className="sticky top-0 z-30 border-b border-white/10 bg-[#070b16]/80 backdrop-blur-md">
-        <div className="mx-auto flex h-16 max-w-5xl items-center justify-between gap-3 px-4">
-          <button
-            type="button"
-            onClick={() => navigate("/")}
-            className="cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#22d3ee]/60 rounded-md"
-            aria-label="بازگشت به خانه"
-          >
-            <Logo textClassName="text-white" />
-          </button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => navigate("/")}
-            className="cursor-pointer border-white/15 bg-transparent text-[#e2e8ff] hover:bg-white/5"
-          >
-            <ArrowRightIcon className="size-4" />
-            بازگشت به خانه
-          </Button>
-        </div>
-      </header>
-
-      <main className="flex-1 mx-auto w-full max-w-5xl px-4 py-10">
+    <div dir="rtl" className="w-full text-[#e2e8ff]" style={FONT_STACK}>
+      <main className="mx-auto w-full max-w-5xl py-6">
         {/* brand banner (asovin.webp) — compact, top-left in RTL (= visual right
             of the page header line). Kept small so the actual step list owns the page. */}
         <div className="mb-8 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -717,7 +688,7 @@ export function Training({ navigate }: TrainingProps) {
             <img
               src="/brand/asovin.webp"
               alt="نمای برند پُست‌یار"
-              className="block w-40 rounded-xl border border-white/10 shadow-lg shadow-[#070b16] object-cover aspect-[4/3] sm:w-56 md:w-64"
+              className="block w-40 rounded-xl border border-white/10 shadow-lg bg-[#0d1322] object-contain aspect-[3/4] sm:w-56 md:w-64"
               loading="lazy"
               decoding="async"
             />
@@ -729,7 +700,7 @@ export function Training({ navigate }: TrainingProps) {
             </Badge>
             <h1 className="mt-3 text-3xl font-black text-white md:text-4xl">آموزش گام‌به‌گام پُست‌یار</h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#94a3b8]">
-              در گام‌های ساده و در ۶ گروه، از ثبت‌نام تا تنظیمات سامانه، با همهٔ قابلیت‌های داشبورد پُست‌یار آشنا شوید.
+              در گام‌های ساده و در ۶ گروه، با همهٔ قابلیت‌های داشبورد پُست‌یار آشنا شوید؛ از مدیریت حساب و محتوا تا بات‌سازی و تنظیمات سامانه.
             </p>
           </div>
         </div>
@@ -798,48 +769,21 @@ export function Training({ navigate }: TrainingProps) {
         >
           <div className="flex flex-col items-start gap-4 md:flex-row md:items-center md:justify-between">
             <div>
-              <h3 className="text-base font-bold text-white">آمادهٔ شروع هستید؟</h3>
+              <h3 className="text-base font-bold text-white">سؤال دیگری دارید؟</h3>
               <p className="mt-1 text-sm leading-6 text-[#94a3b8]">
-                همین حالا حساب کاربری بسازید و منتشر کردن را آغاز کنید.
+                اگر دربارهٔ هر بخش از داشبورد به راهنمایی بیش‌تری نیاز داشتید، از بخش «تیکت‌ها» با پشتیبانی در تماس باشید.
               </p>
             </div>
             <Button
-              onClick={() => navigate("/")}
+              onClick={() => navigate("/dashboard/tickets")}
               className="cursor-pointer bg-[#f59e0b] text-[#05070f] font-bold hover:bg-[#f59e0b]/90 border border-[#f59e0b]/40"
             >
-              بازگشت به خانه
+              رفتن به تیکت‌ها
               <ArrowLeftIcon className="size-4" />
             </Button>
           </div>
         </div>
       </main>
-
-      {/* sticky footer */}
-      <footer className="mt-auto border-t border-white/10 bg-[#05070f] py-6">
-        <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-3 px-4 text-xs text-[#94a3b8] md:flex-row">
-          <div className="flex items-center gap-2">
-            <Logo size={20} withText={false} />
-            <span className="font-bold text-white">پُست‌یار</span>
-          </div>
-          <div className="flex flex-wrap items-center justify-center gap-4">
-            <button
-              type="button"
-              onClick={() => navigate("/")}
-              className="cursor-pointer hover:text-[#22d3ee] motion-safe:transition-colors"
-            >
-              خانه
-            </button>
-            <button
-              type="button"
-              onClick={() => navigate("/rules")}
-              className="cursor-pointer hover:text-[#22d3ee] motion-safe:transition-colors"
-            >
-              قوانین و مقررات
-            </button>
-          </div>
-          <div>© {toPersianDigits(new Date().getFullYear() - 621)} پُست‌یار</div>
-        </div>
-      </footer>
     </div>
   );
 }

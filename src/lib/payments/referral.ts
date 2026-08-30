@@ -204,7 +204,7 @@ export async function getRewardForNewActiveSubscription(input: {
           category: "referral",
           titleFa: "پاداش معرفی دوستان",
           bodyFa: `به‌خاطر دعوت از دوستان شما، ${formatRials(rewardRials)} به کیف پولتان افزوده شد.`,
-          link: "/wallet",
+          link: "/dashboard/referral",
         },
       });
       return { alreadyPaid: false as const };

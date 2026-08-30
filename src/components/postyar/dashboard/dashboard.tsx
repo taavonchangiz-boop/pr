@@ -1196,11 +1196,15 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
         </div>
       </header>
 
-      <div className="flex flex-1">
-        {/* Sidebar — fixed on lg, drawer on smaller */}
+      <div className="flex flex-1 lg:gap-0">
+        {/* Sidebar — on mobile a drawer (fixed + translate), on desktop (lg+)
+            it is FIXED below the header so the menu never moves when the
+            main content is scrolled. The main content gets a right padding
+            on desktop (lg:pr-64) to clear the fixed sidebar. */}
         <aside
           className={cn(
-            "fixed lg:static inset-y-0 right-0 z-30 w-64 border-l border-border/60 bg-card/70 backdrop-blur-md transition-transform lg:translate-x-0 lg:border-l-0 lg:bg-transparent lg:backdrop-blur-none supports-[backdrop-filter]:bg-card/50",
+            "fixed lg:fixed inset-y-0 right-0 z-30 w-64 border-l border-border/60 bg-card/70 backdrop-blur-md transition-transform lg:translate-x-0 lg:border-l-0 lg:bg-transparent lg:backdrop-blur-none supports-[backdrop-filter]:bg-card/50",
+            "lg:top-16 lg:bottom-0 lg:overflow-y-auto",
             sidebarOpen ? "translate-x-0" : "translate-x-full lg:translate-x-0",
           )}
           style={{ top: "4rem" }}
@@ -1226,10 +1230,11 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
         )}
 
         {/* Main — extra bottom padding on mobile so the fixed bottom navbar
-            never covers content (lg:pb-6 restores the original desktop spacing). */}
+            never covers content (lg:pb-6 restores the original desktop spacing).
+            lg:pr-64 clears the fixed 16rem (w-64) desktop sidebar on the right. */}
         <main
           ref={mainScrollRef}
-          className="flex-1 p-4 pb-24 lg:p-6 lg:pb-6"
+          className="flex-1 p-4 pb-24 lg:p-6 lg:pr-64 lg:pb-6"
           dir="rtl"
         >
           <div className="mx-auto flex max-w-6xl flex-col gap-6">

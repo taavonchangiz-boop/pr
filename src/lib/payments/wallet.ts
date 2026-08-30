@@ -190,6 +190,7 @@ export async function adminAdjustWallet(input: {
           (direction === "credit" ? "مبلغ " : "کسر مبلغ ") +
           formatRials(amountAbs) +
           (input.reason ? ` — دلیل: ${input.reason}` : ""),
+        link: "/dashboard/wallet",
       },
     });
 
@@ -302,7 +303,7 @@ export async function refund(input: {
         category: "payment",
         titleFa: "بازگاشت وجه",
         bodyFa: `مبلغ ${formatRials(input.amount)} به کیف پول شما بازگشت داده شد.`,
-        link: `/wallet`,
+        link: "/dashboard/wallet",
       },
     });
     // Idempotent re-entry: if the upsert no-op'd (duplicate idem key),
