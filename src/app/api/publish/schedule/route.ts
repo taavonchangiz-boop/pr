@@ -6,7 +6,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { requireUser, clientIp, audit, AuthError } from "@/lib/server/auth";
+import { requireUser, clientIp, audit, AuthError, safeJsonParse } from "@/lib/server/auth";
 import { rateLimit } from "@/lib/security/cache";
 import { jalaliToUtcIso } from "@/lib/persian";
 import { assertTransition, isContentStatus } from "@/lib/publishing/state";
@@ -119,6 +119,23 @@ export async function POST(req: Request) {
       destinationIds: JSON.stringify(uniqueDestIds),
     },
   });
+
+  // Increment plan usage (publishUsed) on the user's active subscription so the
+  // dashboard usage counter reflects real publishes. Best-effort: never blocks.
+  try {
+    const sub = await db.subscription.findFirst({
+      where: { userId: user.id, status: "active" },
+      orderBy: { createdAt: "desc" },
+    });
+    if (sub) {
+      const used = safeJsonParse<{ publishUsed?: number; aiUsed?: number }>(sub.usedQuota, { publishUsed: 0 });
+      used.publishUsed = (used.publishUsed ?? 0) + uniqueDestIds.length;
+      await db.subscription.update({
+        where: { id: sub.id },
+        data: { usedQuota: JSON.stringify(used) },
+      });
+    }
+  } catch { /* usage tracking is best-effort */ }
 
   await audit({
     userId: user.id,

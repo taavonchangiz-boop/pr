@@ -62,6 +62,10 @@ export async function POST(req: Request) {
 
   const passwordHash = await hashPassword(password);
   const code = await newReferralCode();
+  // FIRST-ADMIN RULE: the very first user to register (incl. mobile-first) is
+  // promoted to admin; every subsequent registrant is a regular user.
+  const userCount = await db.user.count();
+  const role = userCount === 0 ? "admin" : "user";
   const user = await db.user.create({
     data: {
       firstName, lastName,
@@ -72,10 +76,11 @@ export async function POST(req: Request) {
       businessName,
       referralCode: code,
       referredById: referredById ?? null,
+      role,
     },
   });
   await db.profile.create({ data: { userId: user.id } });
   await createSession(user.id, ip, req.headers.get("user-agent"));
-  await audit({ actor: "user", action: "register_otp", targetType: "user", targetId: user.id, ip, meta: { email, mobile } });
+  await audit({ actor: "user", action: userCount === 0 ? "register_first_admin" : "register_otp", targetType: "user", targetId: user.id, ip, meta: { email, mobile, role } });
   return NextResponse.json({ ok: true, user: { id: user.id, firstName, role: user.role } });
 }

@@ -118,6 +118,7 @@ model Content {
   scheduledAt   DateTime?
   publishedAt   DateTime?
   failureReason  String?
+  views          Int      @default(0) // analytics: post views
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -155,6 +156,8 @@ model Destination {
   status        String   @default("active") // active|inactive|error
   lastError     String?
   lastCheckedAt DateTime?
+  views          Int      @default(0) // analytics: channel/profile views
+  clicks         Int      @default(0) // analytics: aggregate button clicks
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -173,6 +176,7 @@ model GlassButton {
   callbackData  String?
   rowOrder      Int      @default(0)
   enabled       Boolean  @default(true)
+  clicks        Int      @default(0) // analytics: per-button click counter
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   @@index([destinationId])

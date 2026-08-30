@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { hashPassword, newReferralCode, clientIp, audit } from "@/lib/server/auth";
+import { hashPassword, newReferralCode, clientIp, audit, createSession } from "@/lib/server/auth";
 import { isValidEmail, isValidIranMobile, normalizeMobile } from "@/lib/persian";
 import { rateLimit } from "@/lib/security/cache";
 
@@ -53,6 +53,11 @@ export async function POST(req: Request) {
 
   const passwordHash = await hashPassword(password);
   const code = await newReferralCode();
+  // FIRST-ADMIN RULE: the very first user to register is promoted to admin.
+  // Every subsequent registrant is created as a regular user ("user").
+  // This guarantees a single, deterministic bootstrap admin with no manual DB edit.
+  const userCount = await db.user.count();
+  const role = userCount === 0 ? "admin" : "user";
   const user = await db.user.create({
     data: {
       firstName, lastName,
@@ -63,10 +68,13 @@ export async function POST(req: Request) {
       businessName,
       referralCode: code,
       referredById: referredById ?? null,
+      role,
     },
   });
   await db.profile.create({ data: { userId: user.id } });
 
-  await audit({ actor: "user", action: "register", targetType: "user", targetId: user.id, ip, meta: { email, mobile: normMobile } });
-  return NextResponse.json({ ok: true, userId: user.id });
+  await audit({ actor: "user", action: userCount === 0 ? "register_first_admin" : "register", targetType: "user", targetId: user.id, ip, meta: { email, mobile: normMobile, role } });
+  // Create a session so the freshly-registered user is immediately logged in.
+  await createSession(user.id, ip, req.headers.get("user-agent"));
+  return NextResponse.json({ ok: true, userId: user.id, user: { id: user.id, firstName, role: user.role } });
 }

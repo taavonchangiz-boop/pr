@@ -9,6 +9,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   ActivityIcon,
+  BarChart3Icon,
   BellIcon,
   BookOpenIcon,
   CreditCardIcon,
@@ -23,6 +24,7 @@ import {
   MessageCircleIcon,
   PackageIcon,
   PencilRulerIcon,
+  PlusIcon,
   RadioIcon,
   SendIcon,
   ServerIcon,
@@ -43,8 +45,14 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useSession } from "@/components/layout/session-provider";
+import { Logo } from "@/components/layout/logo";
+import { HeaderClock } from "@/components/layout/header-clock";
+import { NotificationBell } from "@/components/layout/notification-bell";
 import { cn } from "@/lib/utils";
 import { toPersianDigits } from "@/lib/persian";
+
+import StatsView from "@/components/postyar/dashboard/stats-view";
+import AdminStatsView from "@/components/postyar/admin/stats";
 
 import ContentManagerView from "@/components/postyar/content/view";
 import ContentEditorView from "@/components/postyar/content/editor";
@@ -110,6 +118,7 @@ interface NavItem {
 
 const NAV: NavItem[] = [
   { view: "home", label: "خانه", icon: LayoutGridIcon, group: "account" },
+  { view: "stats", label: "آمار", icon: BarChart3Icon, group: "account" },
   { view: "subscriptions", label: "اشتراک", icon: PackageIcon, group: "account" },
   { view: "plans", label: "پلن‌ها", icon: SparklesIcon, group: "account" },
   { view: "payment", label: "تسویه‌حساب", icon: CreditCardIcon, group: "account" },
@@ -143,6 +152,7 @@ const NAV: NavItem[] = [
   { view: "bot-history", label: "تاریخچه ربات", icon: InboxIcon, group: "bots" },
   { view: "bot-broadcast", label: "پیام گروهی", icon: SendIcon, group: "bots" },
   // پنل مدیریت
+  { view: "admin-stats", label: "آمار سامانه", icon: BarChart3Icon, group: "admin", adminOnly: true },
   { view: "admin-users", label: "کاربران", icon: UsersIcon, group: "admin", adminOnly: true },
   { view: "admin-plans", label: "پلن‌ها", icon: PackageIcon, group: "admin", adminOnly: true },
   { view: "admin-audit", label: "ممیزی", icon: ShieldCheckIcon, group: "admin", adminOnly: true },
@@ -180,12 +190,14 @@ function SideNav({
   onSignOut,
   userName,
   userRole,
+  forceUserMode = false,
 }: {
   active: string;
   onNavigate: (view: string) => void;
   onSignOut: () => void;
   userName: string;
   userRole?: string;
+  forceUserMode?: boolean;
 }) {
   const accountNav = NAV.filter((n) => n.group === "account");
   const contentNav = NAV.filter((n) => n.group === "content");
@@ -193,7 +205,10 @@ function SideNav({
   const channelsNav = NAV.filter((n) => n.group === "channels");
   const botsNav = NAV.filter((n) => n.group === "bots");
   const adminNav = ADMIN_GROUP_ITEMS.filter((n, i, arr) => arr.findIndex((x) => x.view === n.view) === i);
+  // Admins see the admin group ONLY when not in user-mode (forceUserMode hides it
+  // so an admin who switched to "user" mode sees only the regular user nav).
   const isAdmin = userRole === "admin";
+  const showAdminGroup = isAdmin && !forceUserMode;
   return (
     <nav className="flex h-full flex-col gap-1 overflow-y-auto p-2" dir="rtl">
       {accountNav.map((item) => (
@@ -219,7 +234,7 @@ function SideNav({
       {channelsNav.map((item) => (
         <NavLink key={item.view} item={item} active={active} onNavigate={onNavigate} />
       ))}
-      {isAdmin && adminNav.length > 0 && (
+      {showAdminGroup && adminNav.length > 0 && (
         <>
           <div className="my-2 border-t" />
           <div className="px-3 py-1 text-xs font-medium text-muted-foreground">پنل مدیریت</div>
@@ -321,9 +336,86 @@ function NotImplemented({ name }: { name: string }) {
   );
 }
 
+// Bottom mobile navbar — quick-access for the 5 key destinations. Visible
+// ONLY on < lg screens (lg:hidden) so it never collides with the desktop
+// sidebar. The center "انتشار" button is elevated (-mt-6) to act as a FAB.
+function BottomNav({
+  active,
+  onNavigate,
+}: {
+  active: string;
+  onNavigate: (view: string) => void;
+}) {
+  const items: {
+    view: string;
+    label: string;
+    Icon: React.ComponentType<{ className?: string }>;
+    elevated?: boolean;
+  }[] = [
+    { view: "home", label: "خانه", Icon: LayoutGridIcon },
+    { view: "destinations", label: "کانال‌ها", Icon: SendIcon },
+    { view: "content-editor", label: "انتشار", Icon: PlusIcon, elevated: true },
+    { view: "notifications", label: "اعلان‌ها", Icon: BellIcon },
+    { view: "profile", label: "پروفایل", Icon: UserIcon },
+  ];
+  return (
+    <nav
+      dir="rtl"
+      aria-label="ناوبری پایین صفحه"
+      className="fixed inset-x-0 bottom-0 z-30 flex items-stretch justify-between gap-1 border-t bg-background/95 px-2 backdrop-blur lg:hidden"
+      style={{ paddingBottom: "env(safe-area-inset-bottom)" }}
+    >
+      {items.map((it) => {
+        const Icon = it.Icon;
+        const isActive = active === it.view;
+        if (it.elevated) {
+          return (
+            <button
+              key={it.view}
+              type="button"
+              onClick={() => onNavigate(it.view)}
+              aria-label={it.label}
+              aria-current={isActive ? "page" : undefined}
+              className="flex flex-1 flex-col items-center justify-end gap-0.5 pb-1 pt-2 text-[11px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span className="-mt-6 flex size-12 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform motion-safe:hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <Icon className="size-6" />
+              </span>
+              <span className={isActive ? "font-medium text-primary" : "text-muted-foreground"}>
+                {it.label}
+              </span>
+            </button>
+          );
+        }
+        return (
+          <button
+            key={it.view}
+            type="button"
+            onClick={() => onNavigate(it.view)}
+            aria-label={it.label}
+            aria-current={isActive ? "page" : undefined}
+            className={cn(
+              "flex flex-1 flex-col items-center justify-center gap-0.5 py-2 text-[11px] cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+              isActive ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            <Icon className="size-5" />
+            <span className={isActive ? "font-medium" : ""}>{it.label}</span>
+          </button>
+        );
+      })}
+    </nav>
+  );
+}
+
 export function Dashboard({ navigate, initialView, param }: DashboardProps) {
   const { user, signOut } = useSession();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Admin ↔ User mode toggle. Lets an admin "use the app as a regular user"
+  // (user-mode hides admin-only nav + admin views render as inaccessible
+  // surfaces). Defaults to "admin" so admins always start in the admin panel;
+  // non-admins never see the toggle at all.
+  const [mode, setMode] = useState<"admin" | "user">("admin");
 
   // Strip any ?query from initialView/param (in case the editor is opened
   // with ?action=publish — the editor itself surfaces the publish actions).
@@ -347,6 +439,8 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
     switch (cleanView) {
       case "home":
         return <HomeView navigate={navigate} />;
+      case "stats":
+        return <StatsView navigate={navigate} />;
       case "content":
         return <ContentManagerView navigate={navigate} />;
       case "content-editor":
@@ -415,6 +509,8 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
         if (!cleanParam) return <NotImplemented name="پیام گروهی (بدون شناسه ربات)" />;
         return <BotBroadcastView botId={cleanParam} navigate={navigate} />;
       // ===== Task 10-D — Admin Panel views =====
+      case "admin-stats":
+        return <AdminStatsView navigate={navigate} />;
       case "admin-users":
         return <AdminUsersView navigate={navigate} />;
       case "admin-plans":
@@ -465,13 +561,35 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
         >
           {sidebarOpen ? <XIcon className="size-5" /> : <MenuIcon className="size-5" />}
         </Button>
-        <div className="flex items-center gap-2">
-          <div className="rounded-md bg-primary p-1.5 text-primary-foreground">
-            <SendIcon className="size-4" />
-          </div>
-          <span className="font-bold">پُست‌یار</span>
-        </div>
+        <Logo size={28} />
+        <HeaderClock className="hidden sm:block" />
         <div className="flex-1" />
+        {/* Admin ↔ User mode toggle — admins only. Lets an admin switch back
+            and forth between the admin panel and the regular-user surface. */}
+        {user?.role === "admin" && (
+          <Button
+            variant={mode === "admin" ? "outline" : "default"}
+            size="sm"
+            onClick={() => setMode((m) => (m === "admin" ? "user" : "admin"))}
+            aria-pressed={mode === "user"}
+            className="gap-1.5 cursor-pointer"
+          >
+            {mode === "admin" ? (
+              <>
+                <LayoutGridIcon className="size-4" />
+                <span className="hidden sm:inline">دیدن به‌عنوان کاربر</span>
+                <span className="sm:hidden">کاربر</span>
+              </>
+            ) : (
+              <>
+                <ShieldCheckIcon className="size-4" />
+                <span className="hidden sm:inline">بازگشت به پنل مدیریت</span>
+                <span className="sm:hidden">مدیر</span>
+              </>
+            )}
+          </Button>
+        )}
+        <NotificationBell />
         <div className="hidden text-xs text-muted-foreground sm:block">
           کاربر: {userName} • نقش: {roleFa(user?.role)}
         </div>
@@ -493,6 +611,7 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
               onSignOut={onSignOut}
               userName={userName}
               userRole={user?.role}
+              forceUserMode={user?.role === "admin" && mode === "user"}
             />
           </div>
         </aside>
@@ -504,13 +623,18 @@ export function Dashboard({ navigate, initialView, param }: DashboardProps) {
           />
         )}
 
-        {/* Main */}
-        <main className="flex-1 p-4 lg:p-6" dir="rtl">
+        {/* Main — extra bottom padding on mobile so the fixed bottom navbar
+            never covers content (lg:pb-6 restores the original desktop spacing). */}
+        <main className="flex-1 p-4 pb-24 lg:p-6 lg:pb-6" dir="rtl">
           <div className="mx-auto max-w-6xl">
             {renderView()}
           </div>
         </main>
       </div>
+
+      {/* Bottom mobile navbar — quick access to the 5 key destinations.
+          Visible ONLY on < lg so it never collides with the desktop sidebar. */}
+      <BottomNav active={cleanView} onNavigate={onNavigate} />
 
       <footer className="mt-auto border-t py-3 text-center text-xs text-muted-foreground" dir="rtl">
         پُست‌یار © {toPersianDigits(new Date().getFullYear() - 621)} — نسخهٔ پیش‌نمایش

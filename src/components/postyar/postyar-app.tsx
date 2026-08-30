@@ -4,6 +4,8 @@
 import { useEffect, useState, useCallback, useMemo, type ReactNode } from "react";
 import { useSession } from "@/components/layout/session-provider";
 import { Landing } from "@/components/postyar/landing/landing";
+import { Rules } from "@/components/postyar/landing/rules";
+import { Training } from "@/components/postyar/landing/training";
 import { Auth } from "@/components/postyar/auth/auth";
 import { Dashboard } from "@/components/postyar/dashboard/dashboard";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,11 +13,16 @@ import { Toaster } from "@/components/ui/toaster";
 type Route =
   | "landing"
   | "auth"
-  | "dashboard";
+  | "dashboard"
+  | "rules"
+  | "training";
 
 function parseHash(): { route: Route; view?: string; param?: string } {
   const h = window.location.hash.replace(/^#\/?/, "");
   const [route, view, param] = h.split("/");
+  // PUBLIC routes — accessible logged-in OR logged-out
+  if (route === "rules") return { route: "rules" };
+  if (route === "training") return { route: "training" };
   if (!route || route === "landing" || route === "" ) return { route: "landing" };
   if (route === "auth" || route === "login" || route === "register") return { route: "auth" };
   if (route === "dashboard") return { route: "dashboard", view: view ?? "home", param };
@@ -62,6 +69,10 @@ export function PostyarApp() {
       </div>
     );
   }
+
+  // PUBLIC routes — rendered BEFORE the auth gate so logged-out users can view them.
+  if (route === "rules") return <Rules navigate={navigate} />;
+  if (route === "training") return <Training navigate={navigate} />;
 
   if (!user) {
     if (route === "auth") return <Auth navigate={navigate} />;
